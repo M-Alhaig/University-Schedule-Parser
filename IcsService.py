@@ -42,7 +42,7 @@ def parse_duration(duration, day, time_zone="KSA"):
 
 def create_schedule_ics(courses):
     cal = Calendar()
-    cal.add('prodid', '-//University Schedule//Student Portal//')
+    cal.add('prodid', '-//University Schedule//')
     cal.add('version', '2.0')
 
     for course in courses:
@@ -73,3 +73,5 @@ def create_schedule_ics(courses):
 
     with open("calendar.ics", 'wb') as f:
         f.write(cal.to_ical())
+
+    return cal.to_ical()
