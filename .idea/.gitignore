@@ -1,0 +1,21 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+/Tesseract-OCR/
+/poppler/
+/doc/
+/cropped_box.png
+/calendar.ics
+/detected_boxes.png
+/horizontal_lines.jpg
+/Image_bin.jpg
+/img_final_bin.jpg
+/output.png
+/schedule_with_boxes.pdf
+/vertical_lines.jpg
