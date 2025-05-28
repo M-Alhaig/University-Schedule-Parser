@@ -1,14 +1,15 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import cv2
 import numpy as np
 import re
 import pytesseract
 from pydantic import BaseModel
-from PIL import Image
 import easyocr
 import json
 from IcsService import create_schedule_ics
+from ParseImg import handle_img
 from ParsePDF import handle_pdf
 
 
@@ -27,7 +28,7 @@ tesseract_path = os.path.join(os.path.dirname(__file__), "Tesseract-OCR", "tesse
 pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
-def extract_boxes_from_image(image, type="PDF"):
+def extract_boxes_from_image(image, file_type="PDF"):
     img = np.array(image)
     if len(img.shape) == 3:
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -54,7 +55,7 @@ def extract_boxes_from_image(image, type="PDF"):
     _, img_final_bin = cv2.threshold(img_final_bin, 128, 255, cv2.THRESH_BINARY)
     cv2.imwrite("img_final_bin.jpg", img_final_bin)
 
-    contours, hierarchy = cv2.findContours(img_final_bin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(img_final_bin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     boxes = []
     image_copy = np.array(image.copy())
@@ -63,7 +64,7 @@ def extract_boxes_from_image(image, type="PDF"):
         area = w * h
         aspect_ratio = w / float(h)
         area_threshold = 20000
-        if type == "IMAGE":
+        if file_type == "IMAGE":
             area_threshold = 2000
 
         if w < 50 or h < 20:
@@ -107,39 +108,59 @@ def get_bbox_days_times(boxes, image):
     return day_boxes, time_x, time_w
 
 
+def extract_single_box(args):
+    box, image, time_x, time_w, day = args
+    x, y, w, h = box
+    w = w + 2
+    # Crop image and prepare it
+    crop = image.crop((x, y, x + w, y + h))
+    crop = cv2.cvtColor(np.array(crop), cv2.COLOR_RGB2GRAY)
+
+    subject_details = pytesseract.image_to_string(crop).strip()
+
+    # Skip duration boxes
+    if re.match(r"\d{2}:\d{2}", subject_details) or not subject_details:
+        return None
+
+    # Extract time for this subject
+    time_box = (time_x, y, time_x + time_w, y + h)
+    time_crop = image.crop(time_box)
+    time = pytesseract.image_to_string(time_crop).strip()
+    subject = {
+        "details": " ".join(subject_details.split()),
+        "day": day if day else "",
+        "time": time.split()
+    }
+    return subject
+
+
 def get_subjects_data(boxes, image):
     day_boxes, time_x, time_w = get_bbox_days_times(boxes, image)
-    subjects = []
 
+    # Prepare tasks for threading
+    tasks = []
     for box in boxes:
         x, y, w, h = box
 
+        # Skip day boxes
         if any(day_box[0] == box for day_box in day_boxes):
             continue
 
+        # Find the day for this box
         day = None
         for day_box in day_boxes:
             if abs(day_box[0][0] - x) < 2:
                 day = day_box[1]
                 break
 
-        crop = image.crop((x, y, x + w, y + h))
-        crop = cv2.cvtColor(np.array(crop), cv2.COLOR_RGB2GRAY)
-        subject_details = pytesseract.image_to_string(crop).strip()
+        tasks.append((box, image, time_x, time_w, day))
 
-        # Skip time boxes and empty boxes
-        if re.match(r"\d{2}:\d{2}", subject_details) or not subject_details:
-            continue
+    # Process all tasks in parallel
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(extract_single_box, tasks))
 
-        # Extract time for this row
-        time_box = (time_x, y, time_x + time_w, y + h)
-        time_crop = image.crop(time_box)
-        time = pytesseract.image_to_string(time_crop).strip()
-        subjects.append({
-            "details": " ".join(subject_details.split()),
-            "day": day if day else "",
-            "time": time.split()
-        })
+    # Filter out None results
+    subjects = [subject for subject in results if subject is not None]
     return subjects
 
 def create_courses(subjects):
@@ -147,6 +168,7 @@ def create_courses(subjects):
     subject_objects = []
     for subject in subjects:
         match = re.search(regex, subject["details"])
+
         if match:
             subject_object = Course(
                 name=match.group(1),
@@ -164,21 +186,21 @@ def create_courses(subjects):
 
 
 async def parse(file):
-    pdf_bytes = await file.read()
-    pdf_stream = BytesIO(pdf_bytes)
+    file_bytes = await file.read()
+    file_buffer = BytesIO(file_bytes)
 
     if file.content_type == "application/pdf":
-        image = handle_pdf(pdf_stream)
-        type = "PDF"
-    else:
-        image = Image.open(pdf_stream).convert("RGB")
-        type = "IMAGE"
+        image, file_type = handle_pdf(file_buffer)
 
-    boxes = extract_boxes_from_image(image, type=type)
+    else:
+        image, file_type = handle_img(file_buffer)
+
+
+    boxes = extract_boxes_from_image(image, file_type=file_type)
     subjects = get_subjects_data(boxes, image)
     courses = create_courses(subjects)
 
-    cal = create_schedule_ics(courses)
+    create_schedule_ics(courses)
 
     image.save("output.png")
-    return cal
+    return courses
