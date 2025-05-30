@@ -10,6 +10,7 @@ def handle_img(img):
         image = Image.open(img)
     except Exception:
         image = img
+
     width, height = image.size
     cropped = image.crop((0, 0, width, height // 4))
 

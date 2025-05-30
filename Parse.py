@@ -5,9 +5,8 @@ import cv2
 import numpy as np
 import re
 import pytesseract
+from fastapi import HTTPException
 from pydantic import BaseModel
-import easyocr
-import json
 from IcsService import create_schedule_ics
 from ParseImg import handle_img
 from ParsePDF import handle_pdf
@@ -26,6 +25,50 @@ class Course(BaseModel):
 
 tesseract_path = os.path.join(os.path.dirname(__file__), "Tesseract-OCR", "tesseract.exe")
 pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+
+def calculate_iou(box, filtered_box):
+    x1, y1, w1, h1 = box
+    x2, y2, w2, h2 = filtered_box
+
+    # Coords of intersection rectangle
+    x_left = max(x1, x2)
+    y_top = max(y1, y2)
+    x_right = min(x1 + w1, x2 + w2)
+    y_bottom = min(y1 + h1, y2 + h2)
+
+    # Check for no intersection
+    if x_left > x_right or y_top > y_bottom:
+        return 0.0
+
+    area_intersection = (x_right - x_left) * (y_bottom - y_top)
+
+    box1_area = w1 * h1
+    box2_area = w2 * h2
+
+    iou = area_intersection / (box1_area + box2_area - area_intersection)
+    return iou
+
+
+def filter_duplicate_boxes(boxes, iou_threshold=0.8):
+
+    boxes = sorted(boxes, key=lambda box: box[2] * box[3])
+
+    filtered_boxes = []
+
+    for box in boxes:
+        duplicate = False
+
+        for filtered_box in filtered_boxes:
+            iou = calculate_iou(box, filtered_box)
+            if iou > iou_threshold:
+                duplicate = True
+                break
+
+        if not duplicate:
+            filtered_boxes.append(box)
+
+    return filtered_boxes
 
 
 def extract_boxes_from_image(image, file_type="PDF"):
@@ -69,14 +112,19 @@ def extract_boxes_from_image(image, file_type="PDF"):
 
         if w < 50 or h < 20:
             continue
-        if area < area_threshold or area > 400000:
+        if area < area_threshold or area > 800000:
             continue
         if aspect_ratio < 0.2 or aspect_ratio > 10:
             continue
 
         boxes.append((x, y, w, h))
-        cv2.rectangle(image_copy, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
+
+
+    boxes = filter_duplicate_boxes(boxes, iou_threshold=0.1)
+    for box in boxes:
+        x, y, w, h = box
+        cv2.rectangle(image_copy, (x, y), (x + w, y + h), (0, 0, 255), 2)
     cv2.imwrite("detected_boxes.png", image_copy)
     boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
     return boxes
@@ -112,10 +160,9 @@ def extract_single_box(args):
     box, image, time_x, time_w, day = args
     x, y, w, h = box
     w = w + 2
+
     # Crop image and prepare it
     crop = image.crop((x, y, x + w, y + h))
-    crop = cv2.cvtColor(np.array(crop), cv2.COLOR_RGB2GRAY)
-
     subject_details = pytesseract.image_to_string(crop).strip()
 
     # Skip duration boxes
@@ -136,7 +183,6 @@ def extract_single_box(args):
 
 def get_subjects_data(boxes, image):
     day_boxes, time_x, time_w = get_bbox_days_times(boxes, image)
-
     # Prepare tasks for threading
     tasks = []
     for box in boxes:
@@ -149,7 +195,7 @@ def get_subjects_data(boxes, image):
         # Find the day for this box
         day = None
         for day_box in day_boxes:
-            if abs(day_box[0][0] - x) < 2:
+            if abs(day_box[0][0] - x) < 10:
                 day = day_box[1]
                 break
 
@@ -186,21 +232,22 @@ def create_courses(subjects):
 
 
 async def parse(file):
-    file_bytes = await file.read()
-    file_buffer = BytesIO(file_bytes)
 
-    if file.content_type == "application/pdf":
-        image, file_type = handle_pdf(file_buffer)
+    try:
+        file_bytes = await file.read()
+        file_buffer = BytesIO(file_bytes)
 
-    else:
-        image, file_type = handle_img(file_buffer)
+        if file.content_type == "application/pdf":
+            image, file_type = handle_pdf(file_buffer)
+        else:
+            image, file_type = handle_img(file_buffer)
+        boxes = extract_boxes_from_image(image, file_type=file_type)
+        subjects = get_subjects_data(boxes, image)
+        courses = create_courses(subjects)
 
+        create_schedule_ics(courses)
 
-    boxes = extract_boxes_from_image(image, file_type=file_type)
-    subjects = get_subjects_data(boxes, image)
-    courses = create_courses(subjects)
-
-    create_schedule_ics(courses)
-
-    image.save("output.png")
-    return courses
+        image.save("output.png")
+        return courses
+    except Exception:
+        raise HTTPException(status_code=400, detail="File Corrupted or not supported.")

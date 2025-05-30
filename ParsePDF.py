@@ -12,6 +12,8 @@ from ParseImg import handle_img
 
 def process_pdf(doc):
     if doc.page_count == 2:
+
+        # Points to crop from each page to merge them vertically
         page1_crop = 14.5
         page2_crop = 14.5
 
@@ -23,13 +25,15 @@ def process_pdf(doc):
         rect1 = page2.rect
 
         text = page1.get_text()
+
+        # If text not embedded in PDF (eg. Chrome PDFs)
         if not text:
             rect = doc[0].rect
             width, height = rect.width, rect.height
 
             # Define clip rectangles
-            clip1 = fitz.Rect(0, 0, width, height - 17)  # Page 1: keep from 14.5pt down
-            clip2 = fitz.Rect(0, 42.0, width, height)  # Page 2: keep from 35pt down
+            clip1 = fitz.Rect(0, 0, width, height - 17)
+            clip2 = fitz.Rect(0, 42.0, width, height)
 
             # Render cropped portions
             pix1 = doc[0].get_pixmap(clip=clip1, dpi=300)
@@ -44,8 +48,9 @@ def process_pdf(doc):
             merged.paste(img1, (0, 0))
             merged.paste(img2, (0, img1.height))
 
-            # Show or save the result
+
             return handle_img(merged)
+
 
         new_rect0 = fitz.Rect(rect0.x0, rect0.y0, rect0.x1, rect0.y1 - page1_crop)
         new_rect1 = fitz.Rect(rect1.x0, rect1.y0 + page2_crop, rect1.x1, rect1.y1)
@@ -53,11 +58,8 @@ def process_pdf(doc):
         page1.set_cropbox(new_rect0)
         page2.set_cropbox(new_rect1)
 
-
-
-
         # Get their sizes
-        r1 = page2.rect
+        r1 = page1.rect
         r2 = page2.rect
 
         # Create new PDF with one page big enough to hold both vertically
@@ -96,7 +98,7 @@ def draw_pdf_line(doc):
     if not bbox:
         raise HTTPException(status_code=400, detail="PDF format not supported.")
 
-    x_right = float(bbox["x1"]) + 20  # 10 points right
+    x_right = float(bbox["x1"]) + 35  # 10 points right
     top = float(bbox["top"]) - 10 # 10 points up
     bottom = float(bbox["bottom"])
 
@@ -113,8 +115,13 @@ def pdf_to_images(pdf_data):
     return images
 
 def handle_pdf(pdf_stream):
-    doc = fitz.open(stream=pdf_stream, filetype="pdf")
-    pdf_stream = process_pdf(doc)
+    try:
+        doc = fitz.open(stream=pdf_stream, filetype="pdf")
+        pdf_stream = process_pdf(doc)
+    except Exception:
+        raise HTTPException(status_code=400, detail="PDF format not supported.")
+
     if pdf_stream[1] == "IMAGE":
         return pdf_stream[0], pdf_stream[1]
+
     return pdf_to_images(pdf_stream[0])[0], pdf_stream[1]
