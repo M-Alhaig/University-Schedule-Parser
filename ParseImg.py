@@ -5,7 +5,7 @@ from pytesseract import Output
 import cv2
 
 
-def handle_img(img):
+def handle_img(img, browser="CHROME"):
     try:
         image = Image.open(img)
     except Exception:
@@ -17,7 +17,7 @@ def handle_img(img):
     data = pytesseract.image_to_data(cropped, output_type=Output.DICT)
 
     keyword = "THURSDAY"
-    padding = 63
+    padding = 200
     img_np = np.array(image)
     for i, word in enumerate(data['text']):
         if word.strip().lower() == keyword.lower():

@@ -239,21 +239,21 @@ def create_courses(subjects):
     return subject_objects
 
 
-async def parse(file):
+async def parse(file, browser):
 
 
     file_bytes = await file.read()
     file_buffer = BytesIO(file_bytes)
 
     if file.content_type == "application/pdf":
-        image, file_type = handle_pdf(file_buffer)
+        image, file_type = handle_pdf(file_buffer, browser)
     else:
-        image, file_type = handle_img(file_buffer)
+        image, file_type = handle_img(file_buffer, browser)
     boxes = extract_boxes_from_image(image, file_type=file_type)
     subjects = get_subjects_data(boxes, image)
     courses = create_courses(subjects)
 
-    create_schedule_ics(courses)
+    calendar = create_schedule_ics(courses)
 
     image.save("output.png")
-    return courses
+    return calendar

@@ -10,13 +10,16 @@ from pdf2image import convert_from_bytes
 from ParseImg import handle_img
 
 
-def process_pdf(doc):
+def process_pdf(doc, browser="CHROME"):
     if doc.page_count == 2:
 
         # Points to crop from each page to merge them vertically
         page1_crop = 14.5
-        page2_crop = 14.5
+        page2_crop = 40
 
+        if browser == "FIREFOX":
+            page1_crop = 14.5
+            page2_crop = 14.5
 
         page1 = doc.load_page(0)
         page2 = doc.load_page(1)
@@ -26,13 +29,13 @@ def process_pdf(doc):
 
         text = page1.get_text()
 
-        # If text not embedded in PDF (eg. Chrome PDFs)
+        # If text not embedded in PDF (eg. Windows Chrome PDFs)
         if not text:
             rect = doc[0].rect
             width, height = rect.width, rect.height
 
             # Define clip rectangles
-            clip1 = fitz.Rect(0, 0, width, height - 17)
+            clip1 = fitz.Rect(0, 0, width, height - 21)
             clip2 = fitz.Rect(0, 42.0, width, height)
 
             # Render cropped portions
@@ -49,7 +52,7 @@ def process_pdf(doc):
             merged.paste(img2, (0, img1.height))
 
 
-            return handle_img(merged)
+            return handle_img(merged, browser)
 
 
         new_rect0 = fitz.Rect(rect0.x0, rect0.y0, rect0.x1, rect0.y1 - page1_crop)
@@ -98,7 +101,7 @@ def draw_pdf_line(doc):
     if not bbox:
         raise HTTPException(status_code=400, detail="PDF format not supported.")
 
-    x_right = float(bbox["x1"]) + 35  # 10 points right
+    x_right = float(bbox["x1"]) + 100  # 10 points right
     top = float(bbox["top"]) - 10 # 10 points up
     bottom = float(bbox["bottom"])
 
@@ -120,10 +123,10 @@ def pdf_to_images(pdf_data):
     images = convert_from_bytes(pdf_data.getvalue(), dpi=300, poppler_path=poppler_path)  # Higher DPI = better quality
     return images
 
-def handle_pdf(pdf_stream):
+def handle_pdf(pdf_stream, browser):
     try:
         doc = fitz.open(stream=pdf_stream, filetype="pdf")
-        pdf_stream = process_pdf(doc)
+        pdf_stream = process_pdf(doc, browser=browser)
     except Exception:
         raise HTTPException(status_code=400, detail="PDF format not supported.")
 
