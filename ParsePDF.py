@@ -1,6 +1,6 @@
 import os
 from io import BytesIO
-
+import platform
 import fitz
 import pdfplumber
 from PIL import Image
@@ -110,7 +110,13 @@ def draw_pdf_line(doc):
     return pdf_buffer
 
 def pdf_to_images(pdf_data):
-    poppler_path = os.path.join(os.path.dirname(__file__), "poppler", "Library", "bin")
+    if platform.system() == "Windows":
+        # Use your local Windows folders and executables
+        poppler_path = os.path.join(os.path.dirname(__file__), "poppler", "Library", "bin")
+    else:
+        # Inside Linux container (or Linux machine)
+        # Assume tesseract and poppler-utils installed system-wide
+        poppler_path = "/usr/bin"  # typical path for poppler utils binaries
     images = convert_from_bytes(pdf_data.getvalue(), dpi=300, poppler_path=poppler_path)  # Higher DPI = better quality
     return images
 

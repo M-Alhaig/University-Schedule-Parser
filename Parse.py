@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from IcsService import create_schedule_ics
 from ParseImg import handle_img
 from ParsePDF import handle_pdf
-
+import platform
 
 class Course(BaseModel):
     name: str
@@ -23,7 +23,15 @@ class Course(BaseModel):
     duration: str
 
 
-tesseract_path = os.path.join(os.path.dirname(__file__), "Tesseract-OCR", "tesseract.exe")
+
+if platform.system() == "Windows":
+    # Use your local Windows folders and executables
+    tesseract_path = os.path.join(os.path.dirname(__file__), "Tesseract-OCR", "tesseract.exe")
+else:
+    # Inside Linux container (or Linux machine)
+    # Assume tesseract and poppler-utils installed system-wide
+    tesseract_path = "tesseract"  # system command in PATH
+
 pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
@@ -233,21 +241,19 @@ def create_courses(subjects):
 
 async def parse(file):
 
-    try:
-        file_bytes = await file.read()
-        file_buffer = BytesIO(file_bytes)
 
-        if file.content_type == "application/pdf":
-            image, file_type = handle_pdf(file_buffer)
-        else:
-            image, file_type = handle_img(file_buffer)
-        boxes = extract_boxes_from_image(image, file_type=file_type)
-        subjects = get_subjects_data(boxes, image)
-        courses = create_courses(subjects)
+    file_bytes = await file.read()
+    file_buffer = BytesIO(file_bytes)
 
-        create_schedule_ics(courses)
+    if file.content_type == "application/pdf":
+        image, file_type = handle_pdf(file_buffer)
+    else:
+        image, file_type = handle_img(file_buffer)
+    boxes = extract_boxes_from_image(image, file_type=file_type)
+    subjects = get_subjects_data(boxes, image)
+    courses = create_courses(subjects)
 
-        image.save("output.png")
-        return courses
-    except Exception:
-        raise HTTPException(status_code=400, detail="File Corrupted or not supported.")
+    create_schedule_ics(courses)
+
+    image.save("output.png")
+    return courses
