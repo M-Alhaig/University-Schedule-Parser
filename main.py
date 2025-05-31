@@ -1,11 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, logger, Form
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
+import logging
 from Parse import parse
 
 app = FastAPI()
-logger = logger.logger
+logger = logging.getLogger("uvicorn")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
@@ -36,6 +37,7 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
     if file.content_type != "application/pdf":
         return JSONResponse(content={"message": "Invalid file type"}, status_code=400)
     try:
+        logger.info(f"Parsing file {file.filename} with browser {browser}")
         browser = browser.upper()
         response = await parse(file, browser)
         return response
