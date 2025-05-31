@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from Parse import parse
@@ -40,7 +40,12 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
         logger.info(f"Parsing file {file.filename} with browser {browser}")
         browser = browser.upper()
         response = await parse(file, browser)
-        return response
+        return Response(
+        content=response,
+        media_type="text/calendar",
+        headers={
+            "Content-Disposition": "attachment; filename=calendar.ics"
+        })
     except ValueError as e:
         return JSONResponse(content={"error": "Validation error", "details": str(e)}, status_code=400)
     except Exception as e:
