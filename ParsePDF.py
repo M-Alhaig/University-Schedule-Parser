@@ -35,7 +35,7 @@ def process_pdf(doc, browser="CHROME"):
             width, height = rect.width, rect.height
 
             # Define clip rectangles
-            clip1 = fitz.Rect(0, 0, width, height - 21)
+            clip1 = fitz.Rect(0, 0, width, height - 24)
             clip2 = fitz.Rect(0, 42.0, width, height)
 
             # Render cropped portions
