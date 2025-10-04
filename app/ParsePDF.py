@@ -108,7 +108,10 @@ def draw_pdf_line(doc):
 
     if not bbox:
         logger.error(f"Required keyword not found in PDF. Expected one of: {target_keywords}")
-        raise HTTPException(status_code=400, detail="PDF format not supported.")
+        raise HTTPException(
+            status_code=400,
+            detail="PDF format not supported. Unable to detect schedule layout."
+        )
 
     x_right = float(bbox["x1"]) + config.KEYWORD_PADDING
     top = float(bbox["top"]) - 10
@@ -144,9 +147,15 @@ def handle_pdf(pdf_stream, browser):
     try:
         doc = fitz.open(stream=pdf_stream, filetype="pdf")
         pdf_stream = process_pdf(doc, browser=browser)
+    except HTTPException:
+        # Re-raise HTTP exceptions with their original detail
+        raise
     except Exception as e:
         logger.error(f"Failed to process PDF: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="PDF format not supported.")
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to process PDF. Please ensure it's a valid schedule document."
+        )
 
     if pdf_stream[1] == "IMAGE":
         logger.info("PDF processed as image type")

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -77,10 +77,20 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
         })
     except ValueError as e:
         logger.warning(f"Validation error while parsing {file.filename}: {e}")
-        return JSONResponse(content={"error": "Validation error", "details": str(e)}, status_code=400)
+        return JSONResponse(
+            content={"error": "Validation error", "message": "Invalid input data"},
+            status_code=400
+        )
+    except HTTPException as e:
+        # Re-raise HTTP exceptions (like from ParsePDF)
+        logger.warning(f"HTTP error while parsing {file.filename}: {e.detail}")
+        raise
     except Exception as e:
         logger.error(f"Internal server error while parsing {file.filename}: {e}", exc_info=True)
-        return JSONResponse(content={"error": "Internal server error"}, status_code=500)
+        return JSONResponse(
+            content={"error": "Internal server error", "message": "Failed to process the file. Please ensure it's a valid schedule PDF."},
+            status_code=500
+        )
 
 handler = Mangum(app)
 

@@ -198,9 +198,77 @@ DEFAULT_TIMEZONE = "KSA"      # KSA (Asia/Riyadh) or ALG (Africa/Algiers)
    - Timeout: 60 seconds
    - Environment variables: (if needed)
 
-3. **Add Function URL or API Gateway**
-   - Enable Function URL for direct HTTPS endpoint
-   - Or create API Gateway REST API
+### Setup API Gateway (Recommended)
+
+**Why API Gateway?**
+- Built-in API key management
+- Built-in rate limiting (throttling)
+- Request validation
+- Usage plans and quotas
+- Cost tracking per API key
+
+**Setup Steps:**
+
+1. **Create REST API**
+   ```bash
+   aws apigateway create-rest-api --name schedule-parser-api --endpoint-configuration types=REGIONAL
+   ```
+
+2. **Create API Key**
+   ```bash
+   # Create API key
+   aws apigateway create-api-key --name schedule-parser-key --enabled
+
+   # Note the API key ID and value
+   ```
+
+3. **Create Usage Plan**
+   ```bash
+   # Create usage plan with rate limiting
+   aws apigateway create-usage-plan \
+     --name schedule-parser-plan \
+     --throttle burstLimit=10,rateLimit=5 \
+     --quota limit=1000,period=MONTH
+
+   # Associate API key with usage plan
+   aws apigateway create-usage-plan-key \
+     --usage-plan-id <usage-plan-id> \
+     --key-id <api-key-id> \
+     --key-type API_KEY
+   ```
+
+4. **Configure API Gateway to Lambda Integration**
+   - Create resource: `/parse`
+   - Create method: `POST`
+   - Integration type: Lambda Function
+   - Lambda Function: `schedule-parser`
+   - Enable API Key Required: Yes
+
+5. **Deploy API**
+   ```bash
+   aws apigateway create-deployment \
+     --rest-api-id <api-id> \
+     --stage-name prod
+   ```
+
+**Rate Limiting Configuration:**
+- **Burst Limit**: 10 requests - Maximum concurrent requests
+- **Rate Limit**: 5 requests/second - Steady-state request rate
+- **Quota**: 1000 requests/month - Monthly usage limit (optional)
+
+**Using the API with API Key:**
+```bash
+curl -X POST "https://<api-id>.execute-api.<region>.amazonaws.com/prod/parse" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -F "file=@schedule.pdf" \
+  -F "browser=CHROME" \
+  -o calendar.ics
+```
+
+**Alternative: Function URL (Not Recommended for Production)**
+- Enable Function URL for direct HTTPS endpoint
+- No built-in authentication or rate limiting
+- Suitable only for development/testing
 
 ## Project Structure
 
