@@ -1,16 +1,18 @@
 """
 Configuration settings for FastAPI Schedule Parser
+Supports environment variable overrides
 """
+import os
 from typing import Dict, Literal
 
 
 class Config:
-    """Application configuration"""
+    """Application configuration with environment variable support"""
 
     # File validation
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-    VALID_BROWSERS = ["CHROME", "FIREFOX"]
-    ALLOWED_CONTENT_TYPES = ["application/pdf"]
+    MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10MB default
+    VALID_BROWSERS = os.getenv("VALID_BROWSERS", "CHROME,FIREFOX").split(",")
+    ALLOWED_CONTENT_TYPES = os.getenv("ALLOWED_CONTENT_TYPES", "application/pdf").split(",")
 
     # PDF Processing - Crop points for multi-page PDFs
     PDF_CROP_POINTS: Dict[str, Dict[str, float]] = {
@@ -32,39 +34,39 @@ class Config:
 
     # Image Processing - Box extraction thresholds
     BOX_EXTRACTION = {
-        "min_width": 50,
-        "min_height": 20,
-        "area_threshold_pdf": 20000,
-        "area_threshold_image": 2000,
-        "max_area": 800000,
-        "min_aspect_ratio": 0.2,
-        "max_aspect_ratio": 10.0,
-        "iou_threshold": 0.1,
-        "kernel_divisor": 80,  # image.shape[1] // kernel_divisor
+        "min_width": int(os.getenv("BOX_MIN_WIDTH", 50)),
+        "min_height": int(os.getenv("BOX_MIN_HEIGHT", 20)),
+        "area_threshold_pdf": int(os.getenv("BOX_AREA_THRESHOLD_PDF", 20000)),
+        "area_threshold_image": int(os.getenv("BOX_AREA_THRESHOLD_IMAGE", 2000)),
+        "max_area": int(os.getenv("BOX_MAX_AREA", 800000)),
+        "min_aspect_ratio": float(os.getenv("BOX_MIN_ASPECT_RATIO", 0.2)),
+        "max_aspect_ratio": float(os.getenv("BOX_MAX_ASPECT_RATIO", 10.0)),
+        "iou_threshold": float(os.getenv("BOX_IOU_THRESHOLD", 0.1)),
+        "kernel_divisor": int(os.getenv("BOX_KERNEL_DIVISOR", 80)),
     }
 
     # Image Processing - OCR settings
-    OCR_DPI = 300
+    OCR_DPI = int(os.getenv("OCR_DPI", 300))
 
     # Image Processing - Day/keyword detection
     DAYS_ENGLISH = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
     DAYS_FRENCH = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"]
-    DETECTION_KEYWORD = "THURSDAY"  # Keyword to find for drawing separator line
-    KEYWORD_PADDING = 100  # Padding after keyword for line placement (in pixels)
+    DETECTION_KEYWORD = os.getenv("DETECTION_KEYWORD", "THURSDAY")
+    KEYWORD_PADDING = int(os.getenv("KEYWORD_PADDING", 100))
 
     # Threading
-    MAX_WORKERS = 8
+    MAX_WORKERS = int(os.getenv("MAX_WORKERS", 8))
 
     # Calendar settings
-    SCHEDULE_DURATION_WEEKS = 19
-    DEFAULT_TIMEZONE: Literal["KSA", "ALG"] = "KSA"
+    SCHEDULE_DURATION_WEEKS = int(os.getenv("SCHEDULE_DURATION_WEEKS", 19))
+    DEFAULT_TIMEZONE: Literal["KSA", "ALG"] = os.getenv("DEFAULT_TIMEZONE", "KSA")  # type: ignore
     TIMEZONES = {
         "KSA": "Asia/Riyadh",
         "ALG": "Africa/Algiers",
     }
 
     # API Settings
-    CALENDAR_FILENAME = "calendar.ics"
+    CALENDAR_FILENAME = os.getenv("CALENDAR_FILENAME", "calendar.ics")
 
 
 # Singleton instance

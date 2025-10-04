@@ -1,14 +1,18 @@
 from icalendar import Calendar, Event
 from datetime import datetime, time, timedelta
+from typing import Tuple, List, TYPE_CHECKING
 import pytz
 import logging
 from app.config import config
+
+if TYPE_CHECKING:
+    from app.Parse import Course
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def parse_duration(duration, day, time_zone="KSA"):
+def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[datetime, datetime, pytz.tzinfo.BaseTzInfo]:
     days_map = {
         "MONDAY":0,
         "TUESDAY":1,
@@ -45,7 +49,7 @@ def parse_duration(duration, day, time_zone="KSA"):
 
     return start_time, end_time, timezone
 
-def create_schedule_ics(courses):
+def create_schedule_ics(courses: List["Course"]) -> bytes:
     logger.info(f"Creating ICS calendar for {len(courses)} courses")
     cal = Calendar()
     cal.add('prodid', '-//University Schedule//')

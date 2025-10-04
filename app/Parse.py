@@ -2,12 +2,16 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
+from typing import List, Tuple, Optional, Dict, Any
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 import re
 import pytesseract
 from pydantic import BaseModel
 import platform
+from PIL import Image
+from fastapi import UploadFile
 
 from app.IcsService import create_schedule_ics
 from app.ParseImg import handle_img
@@ -39,7 +43,17 @@ else:
 pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
-def calculate_iou(box, filtered_box):
+def calculate_iou(box: Tuple[int, int, int, int], filtered_box: Tuple[int, int, int, int]) -> float:
+    """
+    Calculate Intersection over Union (IoU) between two bounding boxes.
+
+    Args:
+        box: First bounding box as (x, y, width, height)
+        filtered_box: Second bounding box as (x, y, width, height)
+
+    Returns:
+        IoU score between 0.0 and 1.0
+    """
     x1, y1, w1, h1 = box
     x2, y2, w2, h2 = filtered_box
 
@@ -62,11 +76,23 @@ def calculate_iou(box, filtered_box):
     return iou
 
 
-def filter_duplicate_boxes(boxes, iou_threshold=0.8):
+def filter_duplicate_boxes(
+    boxes: List[Tuple[int, int, int, int]],
+    iou_threshold: float = 0.8
+) -> List[Tuple[int, int, int, int]]:
+    """
+    Filter out duplicate bounding boxes using IoU threshold.
 
+    Args:
+        boxes: List of bounding boxes as (x, y, width, height)
+        iou_threshold: IoU threshold for considering boxes as duplicates
+
+    Returns:
+        Filtered list of unique bounding boxes
+    """
     boxes = sorted(boxes, key=lambda box: box[2] * box[3])
 
-    filtered_boxes = []
+    filtered_boxes: List[Tuple[int, int, int, int]] = []
 
     for box in boxes:
         duplicate = False
@@ -83,7 +109,10 @@ def filter_duplicate_boxes(boxes, iou_threshold=0.8):
     return filtered_boxes
 
 
-def extract_boxes_from_image(image, file_type="PDF"):
+def extract_boxes_from_image(
+    image: Image.Image,
+    file_type: str = "PDF"
+) -> List[Tuple[int, int, int, int]]:
     logger.info(f"Extracting boxes from {file_type} image")
     img = np.array(image)
     if len(img.shape) == 3:
@@ -142,7 +171,10 @@ def extract_boxes_from_image(image, file_type="PDF"):
     return boxes
 
 
-def get_bbox_days_times(boxes, image):
+def get_bbox_days_times(
+    boxes: List[Tuple[int, int, int, int]],
+    image: Image.Image
+) -> Tuple[List[Tuple[Tuple[int, int, int, int], str]], Optional[int], Optional[int]]:
     DAYS = config.DAYS_ENGLISH + config.DAYS_FRENCH
     logger.info("Detecting day and time boxes")
     day_boxes = []
@@ -172,7 +204,7 @@ def get_bbox_days_times(boxes, image):
     return day_boxes, time_x, time_w
 
 
-def extract_single_box(args):
+def extract_single_box(args: Tuple[Tuple[int, int, int, int], Image.Image, Optional[int], Optional[int], Optional[str]]) -> Optional[Dict[str, Any]]:
     box, image, time_x, time_w, day = args
     x, y, w, h = box
     w = w + 2
@@ -197,7 +229,10 @@ def extract_single_box(args):
     return subject
 
 
-def get_subjects_data(boxes, image):
+def get_subjects_data(
+    boxes: List[Tuple[int, int, int, int]],
+    image: Image.Image
+) -> List[Dict[str, Any]]:
     logger.info("Extracting subjects data")
     day_boxes, time_x, time_w = get_bbox_days_times(boxes, image)
 
@@ -232,7 +267,16 @@ def get_subjects_data(boxes, image):
     logger.info(f"Successfully extracted {len(subjects)} subjects")
     return subjects
 
-def create_courses(subjects):
+def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
+    """
+    Create Course objects from extracted subject data.
+
+    Args:
+        subjects: List of dictionaries containing subject information
+
+    Returns:
+        List of Course objects
+    """
     logger.info(f"Creating course objects from {len(subjects)} subjects")
     regex = r"(.+?)(?:\s+ID:\s*(.+?))?(?:\s+Activity:\s*(.+?))?(?:\s+Section:\s*(.+?))?(?:\s+Campus:\s*(.+?))?(?:\s+Room:\s*(.+?))?$"
     subject_objects = []
@@ -259,7 +303,7 @@ def create_courses(subjects):
     return subject_objects
 
 
-async def parse(file, browser):
+async def parse(file: UploadFile, browser: str) -> bytes:
     logger.info(f"Starting parse workflow for {browser} browser")
 
     file_bytes = await file.read()

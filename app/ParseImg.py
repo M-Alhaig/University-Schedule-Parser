@@ -4,13 +4,15 @@ import pytesseract
 from pytesseract import Output
 import cv2
 import logging
+from typing import Tuple, Union
+from io import BytesIO
 from app.config import config
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def handle_img(img, browser="CHROME"):
+def handle_img(img: Union[BytesIO, Image.Image], browser: str = "CHROME") -> Tuple[Image.Image, str]:
     logger.info(f"Handling image with {browser} browser settings")
     try:
         image = Image.open(img)

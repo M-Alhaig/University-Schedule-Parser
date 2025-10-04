@@ -1,6 +1,7 @@
 import os
 from io import BytesIO
 import platform
+from typing import Tuple, List, Union
 import fitz
 import pdfplumber
 from PIL import Image
@@ -13,7 +14,7 @@ from app.config import config
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-def process_pdf(doc, browser="CHROME"):
+def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Union[BytesIO, Image.Image], str]:
     logger.info(f"Processing {doc.page_count}-page PDF with {browser} browser settings")
 
     if doc.page_count == 2:
@@ -92,7 +93,7 @@ def process_pdf(doc, browser="CHROME"):
 
     return pdf_buffer, "PDF"
 
-def draw_pdf_line(doc):
+def draw_pdf_line(doc: BytesIO) -> BytesIO:
     logger.info("Drawing separator line in PDF")
     bbox = None
     target_keywords = ["THURSDAY", "JEUDI"]
@@ -126,7 +127,16 @@ def draw_pdf_line(doc):
     logger.info("Successfully drew separator line")
     return pdf_buffer
 
-def pdf_to_images(pdf_data):
+def pdf_to_images(pdf_data: BytesIO) -> List[Image.Image]:
+    """
+    Convert PDF bytes to images.
+
+    Args:
+        pdf_data: PDF file as BytesIO
+
+    Returns:
+        List of PIL Images
+    """
     logger.info("Converting PDF to images")
     if platform.system() == "Windows":
         # Use your local Windows folders and executables
@@ -142,7 +152,7 @@ def pdf_to_images(pdf_data):
     logger.info(f"Converted PDF to {len(images)} image(s)")
     return images
 
-def handle_pdf(pdf_stream, browser):
+def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
     logger.info(f"Handling PDF with {browser} browser settings")
     try:
         doc = fitz.open(stream=pdf_stream, filetype="pdf")
