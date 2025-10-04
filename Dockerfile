@@ -1,31 +1,3 @@
-#FROM python:3.10-slim
-#
-#WORKDIR /app
-#
-#RUN apt-get update && apt-get install -y \
-#    libgl1 libglib2.0-0 \
-#    tesseract-ocr tesseract-ocr-eng \
-#    poppler-utils
-#
-#COPY requirements.txt .
-#
-#RUN pip install --no-cache-dir --upgrade pip \
-#    && pip install --no-cache-dir -r requirements.txt
-#
-#COPY . .
-#
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
-# Step 1: Start with an official Python base image.
-# Using a "slim" version keeps the image size smaller.
-# 1. Use the official AWS base image for Python 3.10
-# Stage 1: Build stage to install dependencies
-# Stage 1: The 'build' stage to compile dependencies
-# Stage 1: The 'build' stage using an Ubuntu-based Python image
-# Stage 1: The 'build' stage
-# Stage 1: The 'build' stage
-# Start with a full Python image that is based on a stable OS
 FROM python:3.10-bookworm
 
 # Set the working directory

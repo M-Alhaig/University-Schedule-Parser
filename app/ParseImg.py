@@ -3,22 +3,36 @@ from PIL import Image
 import pytesseract
 from pytesseract import Output
 import cv2
+import logging
+from app.config import config
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def handle_img(img, browser="CHROME"):
+    logger.info(f"Handling image with {browser} browser settings")
     try:
         image = Image.open(img)
+        logger.debug("Opened image from file-like object")
     except Exception:
         image = img
+        logger.debug("Using image object directly")
 
     width, height = image.size
+    logger.info(f"Image dimensions: {width}x{height}")
+
+    # Crop to top quarter for keyword detection
     cropped = image.crop((0, 0, width, height // 4))
+    logger.debug("Cropped top quarter for keyword detection")
 
     data = pytesseract.image_to_data(cropped, output_type=Output.DICT)
 
-    keyword = "THURSDAY"
-    padding = 200
+    keyword = config.DETECTION_KEYWORD
+    padding = config.KEYWORD_PADDING
     img_np = np.array(image)
+
+    line_drawn = False
     for i, word in enumerate(data['text']):
         if word.strip().lower() == keyword.lower():
             x = data['left'][i]
@@ -28,12 +42,16 @@ def handle_img(img, browser="CHROME"):
 
             # Calculate x position just after the keyword
             line_x = x + w + padding
+            logger.info(f"Found keyword '{keyword}' at position ({x}, {y}), drawing line at x={line_x}")
 
             # Draw line on the full image
             line_start = (line_x, 0)
             line_end = (line_x, height)
             cv2.line(img_np, line_start, line_end, color=(0, 0, 0), thickness=1)
-            cv2.imwrite("line.png", img_np)
+            line_drawn = True
             break
+
+    if not line_drawn:
+        logger.warning(f"Keyword '{keyword}' not found in image - no separator line drawn")
 
     return Image.fromarray(img_np), "IMAGE"
