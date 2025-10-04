@@ -15,7 +15,6 @@ from app.ParsePDF import handle_pdf
 from app.config import config
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 class Course(BaseModel):
     name: str

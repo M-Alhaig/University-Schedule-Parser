@@ -3,17 +3,24 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import logging
+import sys
 
 from app.Parse import parse
 from app.config import config
 
+# Configure root logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
 app = FastAPI()
 
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-logger.info("Starting uvicorn server")
+logger.info("Starting FastAPI application")
 
 app.add_middleware(
     CORSMiddleware,
