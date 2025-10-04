@@ -95,6 +95,34 @@ Health check endpoint.
 }
 ```
 
+#### `GET /health`
+Health check endpoint for monitoring.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "schedule-parser"
+}
+```
+
+#### `GET /metrics`
+Get current metrics and statistics.
+
+**Response:**
+```json
+{
+  "requests_total": 150,
+  "requests_success": 142,
+  "requests_failed": 8,
+  "success_rate": 94.67,
+  "avg_processing_time_ms": 2341.23,
+  "min_processing_time_ms": 1205.45,
+  "max_processing_time_ms": 5432.12,
+  "recent_errors_count": 8
+}
+```
+
 #### `POST /parse`
 Upload a schedule PDF and receive an ICS calendar file.
 
@@ -123,6 +151,15 @@ with open('schedule.pdf', 'rb') as f:
         ics.write(response.content)
 ```
 
+**With API Gateway (Production):**
+```bash
+curl -X POST "https://api-id.execute-api.region.amazonaws.com/prod/parse" \
+  -H "X-API-Key: your-api-key-here" \
+  -F "file=@schedule.pdf" \
+  -F "browser=CHROME" \
+  -o calendar.ics
+```
+
 **Response:**
 - Success: ICS file download (200)
 - File too large: Error message (413)
@@ -130,15 +167,45 @@ with open('schedule.pdf', 'rb') as f:
 - Invalid file type: Error message (400)
 - Processing error: Error message (500)
 
+**See `examples/sample_usage.py` for complete Python examples.**
+
 ## Configuration
 
-Edit `app/config.py` to customize:
+Configuration can be set via environment variables or by editing `app/config.py`.
 
-### File Validation
-```python
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-VALID_BROWSERS = ["CHROME", "FIREFOX"]
+### Environment Variables
+
+All configuration values support environment variable overrides:
+
+```bash
+# File validation
+export MAX_FILE_SIZE=10485760              # 10MB in bytes
+export VALID_BROWSERS="CHROME,FIREFOX"
+export ALLOWED_CONTENT_TYPES="application/pdf"
+
+# OCR settings
+export OCR_DPI=300
+export DETECTION_KEYWORD="THURSDAY"
+export KEYWORD_PADDING=100
+
+# Box extraction
+export BOX_MIN_WIDTH=50
+export BOX_MIN_HEIGHT=20
+export BOX_AREA_THRESHOLD_PDF=20000
+export BOX_IOU_THRESHOLD=0.1
+
+# Processing
+export MAX_WORKERS=8
+
+# Calendar settings
+export SCHEDULE_DURATION_WEEKS=19
+export DEFAULT_TIMEZONE="KSA"
+export CALENDAR_FILENAME="calendar.ics"
 ```
+
+### Configuration File
+
+Alternatively, edit `app/config.py` directly:
 
 ### PDF Crop Points
 Adjust crop points for different browser PDF formats:
@@ -270,6 +337,74 @@ curl -X POST "https://<api-id>.execute-api.<region>.amazonaws.com/prod/parse" \
 - No built-in authentication or rate limiting
 - Suitable only for development/testing
 
+## Monitoring & Metrics
+
+The application includes built-in metrics collection for monitoring:
+
+### Available Metrics
+
+- **requests_total**: Total number of parse requests
+- **requests_success**: Successful parse requests
+- **requests_failed**: Failed parse requests
+- **success_rate**: Percentage of successful requests
+- **avg_processing_time_ms**: Average processing time
+- **min/max_processing_time_ms**: Min and max processing times
+- **recent_errors_count**: Count of recent errors
+
+### Accessing Metrics
+
+```bash
+# Get current metrics
+curl http://localhost:8000/metrics
+
+# Response example
+{
+  "requests_total": 150,
+  "requests_success": 142,
+  "requests_failed": 8,
+  "success_rate": 94.67,
+  "avg_processing_time_ms": 2341.23
+}
+```
+
+### CloudWatch Integration
+
+Metrics are logged in JSON format for CloudWatch Logs Insights:
+
+```
+# CloudWatch Logs Insights query
+fields @timestamp, @message
+| filter @message like /METRICS:/
+| parse @message "METRICS: *" as metrics_json
+| display @timestamp, metrics_json
+```
+
+### CloudWatch Alarms (Recommended)
+
+Create alarms for production monitoring:
+
+```bash
+# High error rate alarm
+aws cloudwatch put-metric-alarm \
+  --alarm-name schedule-parser-high-error-rate \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --statistic Sum \
+  --period 300 \
+  --threshold 10 \
+  --comparison-operator GreaterThanThreshold
+
+# Long execution time alarm
+aws cloudwatch put-metric-alarm \
+  --alarm-name schedule-parser-slow-execution \
+  --metric-name Duration \
+  --namespace AWS/Lambda \
+  --statistic Average \
+  --period 300 \
+  --threshold 30000 \
+  --comparison-operator GreaterThanThreshold
+```
+
 ## Project Structure
 
 ```
@@ -277,16 +412,25 @@ FastAPIScheduleParser/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py           # FastAPI application and endpoints
-│   ├── config.py         # Configuration settings
+│   ├── config.py         # Configuration with env var support
+│   ├── metrics.py        # Metrics collection
 │   ├── Parse.py          # Main parsing orchestration
 │   ├── ParsePDF.py       # PDF processing logic
 │   ├── ParseImg.py       # Image processing logic
 │   └── IcsService.py     # ICS calendar generation
+├── tests/                # Unit tests
+│   ├── __init__.py
+│   ├── test_parse.py
+│   ├── test_ics_service.py
+│   └── test_config.py
+├── examples/
+│   └── sample_usage.py   # Example API usage
 ├── Tesseract-OCR/        # Windows only - Tesseract executable
 ├── poppler/              # Windows only - Poppler binaries
 ├── .dockerignore
 ├── .gitignore
 ├── Dockerfile            # AWS Lambda container config
+├── pytest.ini            # Pytest configuration
 ├── requirements.txt
 └── README.md
 ```
@@ -335,9 +479,15 @@ Logs are output to stdout and can be viewed in:
 - Verify the PDF contains a weekly schedule table
 
 ### Poor OCR results
-- Increase DPI in config: `OCR_DPI = 400`
+- Increase DPI via environment variable: `export OCR_DPI=400`
 - Ensure PDF quality is good (not scanned at low resolution)
 - Check Tesseract language data is installed
+
+### Configuration not applying
+- Environment variables must be set before starting the application
+- For Lambda: Set environment variables in Lambda function configuration
+- For Docker: Use `-e` flag: `docker run -e OCR_DPI=400 ...`
+- Restart application after changing configuration
 
 ### Lambda timeout
 - Increase function timeout (60-120s recommended)
@@ -353,8 +503,21 @@ Logs are output to stdout and can be viewed in:
 
 ### Running tests
 ```bash
-# TODO: Add pytest tests
-pytest tests/
+# Install pytest (if not already installed)
+pip install pytest
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_parse.py
+
+# Run with coverage (requires pytest-cov)
+pip install pytest-cov
+pytest --cov=app --cov-report=html
 ```
 
 ### Code formatting
