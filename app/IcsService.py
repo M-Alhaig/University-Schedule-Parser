@@ -48,7 +48,7 @@ def create_schedule_ics(courses):
     for course in courses:
         event = Event()
         start_time, end_time, timezone = parse_duration(course.duration, course.day)
-        until = (start_time + timedelta(weeks=13)).replace(tzinfo=timezone)
+        until = (start_time + timedelta(weeks=19)).replace(tzinfo=timezone)
 
         event.add('summary', course.name)
 
@@ -71,7 +71,7 @@ def create_schedule_ics(courses):
 
         cal.add_component(event)
 
-    with open("calendar.ics", 'wb') as f:
-        f.write(cal.to_ical())
+    # with open("calendar.ics", 'wb') as f:
+    #     f.write(cal.to_ical())
 
     return cal.to_ical()

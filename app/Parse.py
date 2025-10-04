@@ -1,3 +1,4 @@
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
@@ -5,12 +6,15 @@ import cv2
 import numpy as np
 import re
 import pytesseract
-from fastapi import HTTPException
 from pydantic import BaseModel
-from IcsService import create_schedule_ics
-from ParseImg import handle_img
-from ParsePDF import handle_pdf
 import platform
+
+from app.IcsService import create_schedule_ics
+from app.ParseImg import handle_img
+from app.ParsePDF import handle_pdf
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 class Course(BaseModel):
     name: str
@@ -26,7 +30,7 @@ class Course(BaseModel):
 
 if platform.system() == "Windows":
     # Use your local Windows folders and executables
-    tesseract_path = os.path.join(os.path.dirname(__file__), "Tesseract-OCR", "tesseract.exe")
+    tesseract_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Tesseract-OCR", "tesseract.exe")
 else:
     # Inside Linux container (or Linux machine)
     # Assume tesseract and poppler-utils installed system-wide
@@ -80,13 +84,14 @@ def filter_duplicate_boxes(boxes, iou_threshold=0.8):
 
 
 def extract_boxes_from_image(image, file_type="PDF"):
+    logger.info("Extracting boxes from image")
     img = np.array(image)
     if len(img.shape) == 3:
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
     _, img_bin = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
     img_bin = 255 - img_bin
-    cv2.imwrite("Image_bin.jpg", img_bin)
+    # cv2.imwrite("Image_bin.jpg", img_bin)
 
     kernel_length = img.shape[1] // 80
     vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
@@ -95,16 +100,16 @@ def extract_boxes_from_image(image, file_type="PDF"):
 
     img_temp1 = cv2.erode(img_bin, vertical_kernel, iterations=1)
     vertical_lines_img = cv2.dilate(img_temp1, vertical_kernel, iterations=1)
-    cv2.imwrite("vertical_lines.jpg", vertical_lines_img)
+    # cv2.imwrite("vertical_lines.jpg", vertical_lines_img)
 
     img_temp2 = cv2.erode(img_bin, hori_kernel, iterations=1)
     horizontal_lines_img = cv2.dilate(img_temp2, hori_kernel, iterations=1)
-    cv2.imwrite("horizontal_lines.jpg", horizontal_lines_img)
+#     cv2.imwrite("horizontal_lines.jpg", horizontal_lines_img)
 
     img_final_bin = cv2.addWeighted(vertical_lines_img, 0.5, horizontal_lines_img, 0.5, 0.0)
     img_final_bin = cv2.erode(~img_final_bin, kernel, iterations=2)
     _, img_final_bin = cv2.threshold(img_final_bin, 128, 255, cv2.THRESH_BINARY)
-    cv2.imwrite("img_final_bin.jpg", img_final_bin)
+#     cv2.imwrite("img_final_bin.jpg", img_final_bin)
 
     contours, _ = cv2.findContours(img_final_bin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -133,7 +138,7 @@ def extract_boxes_from_image(image, file_type="PDF"):
     for box in boxes:
         x, y, w, h = box
         cv2.rectangle(image_copy, (x, y), (x + w, y + h), (0, 0, 255), 2)
-    cv2.imwrite("detected_boxes.png", image_copy)
+    # cv2.imwrite("detected_boxes.png", image_copy)
     boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
     return boxes
 
@@ -190,6 +195,7 @@ def extract_single_box(args):
 
 
 def get_subjects_data(boxes, image):
+    logger.info("Extracting subjects data")
     day_boxes, time_x, time_w = get_bbox_days_times(boxes, image)
     # Prepare tasks for threading
     tasks = []
@@ -218,6 +224,7 @@ def get_subjects_data(boxes, image):
     return subjects
 
 def create_courses(subjects):
+    logger.info("Creating courses")
     regex = r"(.+?)(?:\s+ID:\s*(.+?))?(?:\s+Activity:\s*(.+?))?(?:\s+Section:\s*(.+?))?(?:\s+Campus:\s*(.+?))?(?:\s+Room:\s*(.+?))?$"
     subject_objects = []
     for subject in subjects:
@@ -246,6 +253,7 @@ async def parse(file, browser):
     file_buffer = BytesIO(file_bytes)
 
     if file.content_type == "application/pdf":
+        logger.info("Parsing PDF")
         image, file_type = handle_pdf(file_buffer, browser)
     else:
         image, file_type = handle_img(file_buffer, browser)
@@ -255,5 +263,5 @@ async def parse(file, browser):
 
     calendar = create_schedule_ics(courses)
 
-    image.save("output.png")
+    # image.save("output.png")
     return calendar

@@ -6,9 +6,11 @@ import pdfplumber
 from PIL import Image
 from fastapi import HTTPException
 from pdf2image import convert_from_bytes
+import logging
+from app.ParseImg import handle_img
 
-from ParseImg import handle_img
-
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def process_pdf(doc, browser="CHROME"):
     if doc.page_count == 2:
@@ -79,7 +81,7 @@ def process_pdf(doc, browser="CHROME"):
         new_page.show_pdf_page(fitz.Rect(0, r1.height, r2.width, r1.height + r2.height), doc, 1)
         doc = new_doc
 
-    doc.save("chrome.pdf")
+    # doc.save("chrome.pdf")
     pdf_bytes = doc.write()
     pdf_buffer = BytesIO(pdf_bytes)
     pdf_buffer = draw_pdf_line(pdf_buffer)
@@ -115,11 +117,12 @@ def draw_pdf_line(doc):
 def pdf_to_images(pdf_data):
     if platform.system() == "Windows":
         # Use your local Windows folders and executables
-        poppler_path = os.path.join(os.path.dirname(__file__), "poppler", "Library", "bin")
+        poppler_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "poppler", "Library", "bin")
     else:
         # Inside Linux container (or Linux machine)
         # Assume tesseract and poppler-utils installed system-wide
         poppler_path = "/usr/bin"  # typical path for poppler utils binaries
+        logger.info(f"Using poppler_path: {poppler_path}")
     images = convert_from_bytes(pdf_data.getvalue(), dpi=300, poppler_path=poppler_path)  # Higher DPI = better quality
     return images
 
