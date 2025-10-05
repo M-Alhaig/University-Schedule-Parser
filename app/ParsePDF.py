@@ -163,8 +163,14 @@ def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
     except HTTPException:
         # Re-raise HTTP exceptions with their original detail
         raise
+    except ValueError as e:
+        logger.error(f"Value error processing PDF: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Unable to process PDF. Please ensure it's a valid schedule document.")
+    except OSError as e:
+        logger.error(f"File error processing PDF: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Unable to process PDF. The file may be corrupted.")
     except Exception as e:
-        logger.error(f"Failed to process PDF: {e}", exc_info=True)
+        logger.error(f"Unexpected error processing PDF - Type: {type(e).__name__}, Message: {e}", exc_info=True)
         raise HTTPException(
             status_code=400,
             detail="Unable to process PDF. Please ensure it's a valid schedule document."

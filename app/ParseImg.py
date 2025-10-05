@@ -16,9 +16,14 @@ def handle_img(img: Union[BytesIO, Image.Image], browser: str = "CHROME") -> Tup
     try:
         image = Image.open(img)
         logger.debug("Opened image from file-like object")
-    except Exception:
-        image = img
-        logger.debug("Using image object directly")
+    except Exception as e:
+        logger.warning(f"Could not open as file-like object (Error: {type(e).__name__}: {e}), attempting to use as PIL Image")
+        if isinstance(img, Image.Image):
+            image = img
+            logger.debug("Using image object directly")
+        else:
+            logger.error(f"Invalid image input - Type: {type(img).__name__}")
+            raise ValueError("Invalid image input. Expected BytesIO or PIL Image.")
 
     width, height = image.size
     logger.info(f"Image dimensions: {width}x{height}")
