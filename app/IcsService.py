@@ -1,6 +1,6 @@
 from icalendar import Calendar, Event
 from datetime import datetime, time, timedelta
-from typing import Tuple, List, TYPE_CHECKING
+from typing import Tuple, List, TYPE_CHECKING, Any
 import pytz
 import logging
 from app.config import config
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[datetime, datetime, pytz.tzinfo.BaseTzInfo]:
+def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[datetime, datetime, Any]:
     days_map = {
         "MONDAY":0,
         "TUESDAY":1,

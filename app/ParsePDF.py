@@ -1,7 +1,7 @@
 import os
 from io import BytesIO
 import platform
-from typing import Tuple, List, Union
+from typing import Tuple, List
 import fitz
 import pdfplumber
 from PIL import Image
@@ -13,7 +13,7 @@ from app.config import config
 
 logger = logging.getLogger(__name__)
 
-def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Union[BytesIO, Image.Image], str]:
+def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Image.Image, str]:
     logger.info(f"Processing {doc.page_count}-page PDF with {browser} browser settings")
 
     if doc.page_count == 2:
@@ -90,7 +90,9 @@ def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Union[Byte
     pdf_buffer = BytesIO(pdf_bytes)
     pdf_buffer = draw_pdf_line(pdf_buffer)
 
-    return pdf_buffer, "PDF"
+    # Convert to image for consistent return type
+    images = pdf_to_images(pdf_buffer)
+    return images[0], "PDF"
 
 def draw_pdf_line(doc: BytesIO) -> BytesIO:
     logger.info("Drawing separator line in PDF")
@@ -156,7 +158,8 @@ def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
     logger.info(f"Handling PDF with {browser} browser settings")
     try:
         doc = fitz.open(stream=pdf_stream, filetype="pdf")
-        pdf_stream = process_pdf(doc, browser=browser)
+        image, file_type = process_pdf(doc, browser=browser)
+        return image, file_type
     except HTTPException:
         # Re-raise HTTP exceptions with their original detail
         raise
@@ -166,10 +169,3 @@ def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
             status_code=400,
             detail="Unable to process PDF. Please ensure it's a valid schedule document."
         )
-
-    if pdf_stream[1] == "IMAGE":
-        logger.info("PDF processed as image type")
-        return pdf_stream[0], pdf_stream[1]
-
-    logger.info("Converting processed PDF to image")
-    return pdf_to_images(pdf_stream[0])[0], pdf_stream[1]
