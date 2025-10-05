@@ -13,8 +13,6 @@ class TestConfig:
         """Test default configuration values"""
         config = Config()
         assert config.MAX_FILE_SIZE > 0
-        assert len(config.VALID_BROWSERS) > 0
-        assert "CHROME" in config.VALID_BROWSERS
         assert config.OCR_DPI == 300
         assert config.SCHEDULE_DURATION_WEEKS == 19
 
@@ -42,10 +40,11 @@ class TestConfig:
         assert len(config.DAYS_ENGLISH) == 7
         assert len(config.DAYS_FRENCH) == 7
 
-    def test_pdf_crop_points(self):
-        """Test PDF crop point configuration"""
+    def test_vertical_line_detection_config(self):
+        """Test vertical line detection configuration"""
         config = Config()
-        assert "CHROME" in config.PDF_CROP_POINTS
-        assert "FIREFOX" in config.PDF_CROP_POINTS
-        assert "page1_crop" in config.PDF_CROP_POINTS["CHROME"]
-        assert "page2_crop" in config.PDF_CROP_POINTS["CHROME"]
+        assert config.VERTICAL_LINE_MIN_LENGTH > 0
+        assert config.VERTICAL_KERNEL_HEIGHT > 0
+        assert config.VERTICAL_KERNEL_WIDTH > 0
+        assert config.EDGE_CLUSTER_THRESHOLD > 0
+        assert config.MIN_VERTICAL_LINES_COUNT > 0

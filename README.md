@@ -205,13 +205,19 @@ All configuration values support environment variable overrides:
 ```bash
 # File validation
 export MAX_FILE_SIZE=10485760              # 10MB in bytes
-export VALID_BROWSERS="CHROME,FIREFOX"
 export ALLOWED_CONTENT_TYPES="application/pdf"
 
 # OCR settings
 export OCR_DPI=300
 export DETECTION_KEYWORD="THURSDAY"
-export KEYWORD_PADDING=100
+export KEYWORD_RIGHT_PADDING=100           # Fallback padding to right of keyword
+
+# Vertical line detection (dynamic table boundary detection)
+export VERTICAL_LINE_MIN_LENGTH=30
+export VERTICAL_KERNEL_HEIGHT=50
+export VERTICAL_KERNEL_WIDTH=1
+export EDGE_CLUSTER_THRESHOLD=20
+export MIN_VERTICAL_LINES_COUNT=3
 
 # Box extraction
 export BOX_MIN_WIDTH=50
@@ -232,13 +238,15 @@ export CALENDAR_FILENAME="calendar.ics"
 
 Alternatively, edit `app/config.py` directly:
 
-### PDF Crop Points
-Adjust crop points for different browser PDF formats:
+### Dynamic Table Boundary Detection
+The system uses vertical line detection to automatically find table boundaries (no hardcoded crop values):
 ```python
-PDF_CROP_POINTS = {
-    "CHROME": {"page1_crop": 14.5, "page2_crop": 40.0},
-    "FIREFOX": {"page1_crop": 14.5, "page2_crop": 14.5}
-}
+# Vertical line detection parameters
+VERTICAL_LINE_MIN_LENGTH = 30           # Minimum line length to detect
+VERTICAL_KERNEL_HEIGHT = 50             # Morphological kernel height
+VERTICAL_KERNEL_WIDTH = 1               # Morphological kernel width
+EDGE_CLUSTER_THRESHOLD = 20             # Pixel threshold for line clustering
+MIN_VERTICAL_LINES_COUNT = 3            # Minimum lines to confirm table
 ```
 
 ### Image Processing Thresholds

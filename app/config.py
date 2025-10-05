@@ -11,26 +11,17 @@ class Config:
 
     # File validation
     MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10MB default
-    VALID_BROWSERS = os.getenv("VALID_BROWSERS", "CHROME,FIREFOX").split(",")
     ALLOWED_CONTENT_TYPES = os.getenv("ALLOWED_CONTENT_TYPES", "application/pdf").split(",")
 
-    # PDF Processing - Crop points for multi-page PDFs
-    PDF_CROP_POINTS: Dict[str, Dict[str, float]] = {
-        "CHROME": {
-            "page1_crop": 14.5,
-            "page2_crop": 40.0,
-        },
-        "FIREFOX": {
-            "page1_crop": 14.5,
-            "page2_crop": 14.5,
-        }
-    }
+    # PDF Processing - Dynamic Table Boundary Detection
+    # Vertical line detection parameters for finding table boundaries
+    VERTICAL_LINE_MIN_LENGTH = int(os.getenv("VERTICAL_LINE_MIN_LENGTH", 30))
+    VERTICAL_KERNEL_HEIGHT = int(os.getenv("VERTICAL_KERNEL_HEIGHT", 50))
+    VERTICAL_KERNEL_WIDTH = int(os.getenv("VERTICAL_KERNEL_WIDTH", 1))
 
-    # PDF Processing - Chrome Windows PDF (image-like PDFs)
-    CHROME_IMAGE_PDF_CROP = {
-        "page1_bottom": 24.0,
-        "page2_top": 42.0,
-    }
+    # Edge detection thresholds
+    EDGE_CLUSTER_THRESHOLD = int(os.getenv("EDGE_CLUSTER_THRESHOLD", 20))  # Pixels to group edges
+    MIN_VERTICAL_LINES_COUNT = int(os.getenv("MIN_VERTICAL_LINES_COUNT", 3))  # Min lines to confirm table
 
     # Image Processing - Box extraction thresholds
     BOX_EXTRACTION = {
@@ -52,11 +43,7 @@ class Config:
     DAYS_ENGLISH = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
     DAYS_FRENCH = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"]
     DETECTION_KEYWORD = os.getenv("DETECTION_KEYWORD", "THURSDAY")
-    KEYWORD_PADDING = int(os.getenv("KEYWORD_PADDING", 100))
-
-    # PDF line drawing (previously hardcoded in ParsePDF.py)
-    PDF_LINE_TOP_OFFSET = int(os.getenv("PDF_LINE_TOP_OFFSET", 10))  # Offset from keyword top
-    PDF_LINE_EXTENSION = int(os.getenv("PDF_LINE_EXTENSION", 1300))  # How far down to extend line
+    KEYWORD_RIGHT_PADDING = int(os.getenv("KEYWORD_RIGHT_PADDING", 100))  # Fallback padding to right of keyword
 
     # Box matching tolerance (previously hardcoded in Parse.py)
     DAY_BOX_TOLERANCE = int(os.getenv("DAY_BOX_TOLERANCE", 10))  # Pixel tolerance for matching day columns
@@ -65,6 +52,9 @@ class Config:
 
     # Threading
     MAX_WORKERS = int(os.getenv("MAX_WORKERS", 8))
+
+    # Debug settings
+    DEBUG_SAVE_BOXES = os.getenv("DEBUG_SAVE_BOXES", "true").lower() == "true"
 
     # Calendar settings
     SCHEDULE_DURATION_WEEKS = int(os.getenv("SCHEDULE_DURATION_WEEKS", 19))

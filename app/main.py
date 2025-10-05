@@ -77,12 +77,8 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
         metrics.record_error("file_too_large", f"File size: {file.size}")
         return JSONResponse(content={"message": "File too large"}, status_code=413)
 
-    # Validate browser parameter
-    if browser.upper() not in config.VALID_BROWSERS:
-        logger.warning(f"Invalid browser parameter: {browser}. Valid options: {config.VALID_BROWSERS}")
-        metrics.increment("requests_failed")
-        metrics.record_error("invalid_browser", f"Browser: {browser}")
-        return JSONResponse(content={"message": "Invalid browser"}, status_code=400)
+    # Note: browser parameter is deprecated (kept for backward compatibility)
+    # Processing now uses dynamic detection regardless of browser value
 
     # Validate content type
     if file.content_type not in config.ALLOWED_CONTENT_TYPES:

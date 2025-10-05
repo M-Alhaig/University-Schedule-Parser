@@ -163,9 +163,16 @@ def extract_boxes_from_image(
     boxes = filter_duplicate_boxes(boxes, iou_threshold=config.BOX_EXTRACTION["iou_threshold"])
     logger.info(f"Filtered to {len(boxes)} unique boxes")
 
-    for box in boxes:
-        x, y, w, h = box
-        cv2.rectangle(image_copy, (x, y), (x + w, y + h), (0, 0, 255), 2)
+    # Save debug image if enabled
+    if config.DEBUG_SAVE_BOXES:
+        for box in boxes:
+            x, y, w, h = box
+            cv2.rectangle(image_copy, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        debug_image = Image.fromarray(image_copy)
+        debug_path = "debug_boxes.png"
+        debug_image.save(debug_path)
+        logger.info(f"Saved debug image with detected boxes to {debug_path}")
 
     boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
     return boxes
@@ -221,10 +228,25 @@ def extract_single_box(args: Tuple[Tuple[int, int, int, int], Image.Image, Optio
     time_box = (time_x, y, time_x + time_w, y + h)
     time_crop = image.crop(time_box)
     time = pytesseract.image_to_string(time_crop).strip()
+
+    # Parse time into components, handling various OCR formats
+    # Examples: "08:00 - 09:00", "08:00-09:00", "08:00 09:00", "08:00- -09:50"
+    time_parts = time.split()
+    # Remove dashes that might be standalone tokens
+    time_parts = [t for t in time_parts if t != '-']
+    # Strip leading/trailing dashes from each part (OCR artifacts)
+    time_parts = [t.strip('-') for t in time_parts]
+    # Remove empty strings after stripping
+    time_parts = [t for t in time_parts if t]
+    # If we have a single token, try splitting by dash
+    if len(time_parts) == 1 and '-' in time_parts[0]:
+        time_parts = time_parts[0].split('-')
+        time_parts = [t.strip() for t in time_parts if t.strip()]
+
     subject = {
         "details": " ".join(subject_details.split()),
         "day": day if day else "",
-        "time": time.split()
+        "time": time_parts
     }
     return subject
 
@@ -241,6 +263,10 @@ def get_subjects_data(
 
     # Prepare tasks for threading
     tasks = []
+
+    # Sort day_boxes by x position for column range detection
+    day_boxes_sorted = sorted(day_boxes, key=lambda d: d[0][0])
+
     for box in boxes:
         x, y, w, h = box
 
@@ -248,12 +274,30 @@ def get_subjects_data(
         if any(day_box[0] == box for day_box in day_boxes):
             continue
 
-        # Find the day for this box
+        # Find the day for this box by checking which day column it falls in
         day = None
-        for day_box in day_boxes:
-            if abs(day_box[0][0] - x) < config.DAY_BOX_TOLERANCE:
+        for i, day_box in enumerate(day_boxes_sorted):
+            day_x = day_box[0][0]
+            day_w = day_box[0][2]
+
+            # Determine column boundaries
+            col_start = day_x - config.DAY_BOX_TOLERANCE
+            if i + 1 < len(day_boxes_sorted):
+                # Use midpoint between this day and next day as boundary
+                next_day_x = day_boxes_sorted[i + 1][0][0]
+                col_end = (day_x + next_day_x) // 2
+            else:
+                # Last column extends to a reasonable width
+                col_end = day_x + day_w + 200
+
+            # Check if box falls within this column
+            box_center_x = x + w // 2
+            if col_start <= box_center_x <= col_end:
                 day = day_box[1]
                 break
+
+        if day is None and config.DEBUG_SAVE_BOXES:
+            logger.warning(f"No day assigned to box at x={x}, y={y}")
 
         tasks.append((box, image, time_x, time_w, day))
 
@@ -281,6 +325,23 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
     regex = r"(.+?)(?:\s+ID:\s*(.+?))?(?:\s+Activity:\s*(.+?))?(?:\s+Section:\s*(.+?))?(?:\s+Campus:\s*(.+?))?(?:\s+Room:\s*(.+?))?$"
     subject_objects = []
     for i, subject in enumerate(subjects):
+        # Validate subject has required time data
+        time_parts = subject.get("time", [])
+        if not time_parts or len(time_parts) < 1:
+            logger.warning(f"Skipping subject {i+1} - missing or invalid time data: {subject.get('details', 'N/A')}")
+            continue
+
+        # Construct duration string
+        # If we have 2+ parts, use first and last (start and end times)
+        # If we have only 1 part and it contains a dash, use it as-is
+        if len(time_parts) >= 2:
+            duration = f"{time_parts[0]}-{time_parts[-1]}"
+        elif len(time_parts) == 1 and '-' in time_parts[0]:
+            duration = time_parts[0]
+        else:
+            logger.warning(f"Skipping subject {i+1} - invalid time format: {time_parts}")
+            continue
+
         match = re.search(regex, subject["details"])
 
         if match:
@@ -292,10 +353,9 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
                 campus=match.group(5) if match.group(5) else "",
                 room=match.group(6) if match.group(6) else "",
                 day=subject["day"],
-                duration=subject["time"][0] + subject["time"][-1]
+                duration=duration
             )
             subject_objects.append(subject_object)
-            logger.debug(f"Created course: {subject_object.name} on {subject_object.day}")
         else:
             logger.warning(f"Failed to parse subject {i+1}: {subject['details']}")
 
@@ -325,7 +385,7 @@ async def parse(file: UploadFile, browser: str) -> bytes:
         if not boxes:
             logger.error("No boxes detected in the schedule image")
             raise ValueError("No schedule table detected. Please ensure the PDF contains a valid weekly schedule table.")
-
+        image.save("test.png")
         subjects = get_subjects_data(boxes, image)
 
         # Validate subjects were extracted
@@ -341,6 +401,7 @@ async def parse(file: UploadFile, browser: str) -> bytes:
             raise ValueError("Failed to parse course information. The schedule format may be invalid.")
 
         logger.info("Generating ICS calendar")
+        logger.info(courses)
         calendar = create_schedule_ics(courses)
 
         logger.info(f"Parse workflow completed successfully: {len(courses)} courses")

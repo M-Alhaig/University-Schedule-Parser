@@ -50,11 +50,25 @@ def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[dat
 
 def create_schedule_ics(courses: List["Course"]) -> bytes:
     logger.info(f"Creating ICS calendar for {len(courses)} courses")
+
+    # Filter out courses with missing critical fields
+    valid_courses = []
+    for course in courses:
+        if not course.day or not course.day.strip():
+            logger.warning(f"Skipping course with empty day: {course.name}")
+            continue
+        if not course.duration or not course.duration.strip():
+            logger.warning(f"Skipping course with empty duration: {course.name}")
+            continue
+        valid_courses.append(course)
+
+    logger.info(f"Processing {len(valid_courses)} valid courses (skipped {len(courses) - len(valid_courses)} invalid)")
+
     cal = Calendar()
     cal.add('prodid', '-//University Schedule//')
     cal.add('version', '2.0')
 
-    for i, course in enumerate(courses):
+    for i, course in enumerate(valid_courses):
         event = Event()
         start_time, end_time, timezone = parse_duration(course.duration, course.day)
         until = (start_time + timedelta(weeks=config.SCHEDULE_DURATION_WEEKS)).replace(tzinfo=timezone)
