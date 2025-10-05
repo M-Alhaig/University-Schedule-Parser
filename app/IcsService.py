@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from app.Parse import Course
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[datetime, datetime, pytz.tzinfo.BaseTzInfo]:

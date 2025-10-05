@@ -12,7 +12,6 @@ from app.ParseImg import handle_img
 from app.config import config
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Union[BytesIO, Image.Image], str]:
     logger.info(f"Processing {doc.page_count}-page PDF with {browser} browser settings")

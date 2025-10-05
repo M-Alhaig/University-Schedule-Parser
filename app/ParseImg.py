@@ -9,7 +9,6 @@ from io import BytesIO
 from app.config import config
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def handle_img(img: Union[BytesIO, Image.Image], browser: str = "CHROME") -> Tuple[Image.Image, str]:
