@@ -52,12 +52,37 @@ All dependencies are included in the Docker image.
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. **Install dependencies**
+3. **Install system dependencies**
+
+   **Windows:**
+   - Install [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
+   - Download [Poppler](https://github.com/oschwartz10612/poppler-windows/releases/)
+   - Extract Poppler to project directory as `poppler/`
+   - Extract Tesseract to project directory as `Tesseract-OCR/`
+
+   **Linux/Ubuntu:**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y tesseract-ocr poppler-utils libgl1-mesa-glx libglib2.0-0
+   ```
+
+   **macOS:**
+   ```bash
+   brew install tesseract poppler
+   ```
+
+4. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Run the application**
+5. **Configure environment (optional)**
+   ```bash
+   cp .env.example .env
+   # Edit .env to customize settings
+   ```
+
+6. **Run the application**
    ```bash
    uvicorn app.main:app --reload
    ```
