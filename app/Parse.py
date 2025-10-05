@@ -310,36 +310,53 @@ async def parse(file: UploadFile, browser: str) -> bytes:
     file_buffer = BytesIO(file_bytes)
     logger.info(f"Read {len(file_bytes)} bytes from uploaded file")
 
-    if file.content_type == "application/pdf":
-        logger.info("Processing PDF file")
-        image, file_type = handle_pdf(file_buffer, browser)
-    else:
-        logger.info("Processing image file")
-        image, file_type = handle_img(file_buffer, browser)
+    image = None
+    try:
+        if file.content_type == "application/pdf":
+            logger.info("Processing PDF file")
+            image, file_type = handle_pdf(file_buffer, browser)
+        else:
+            logger.info("Processing image file")
+            image, file_type = handle_img(file_buffer, browser)
 
-    boxes = extract_boxes_from_image(image, file_type=file_type)
+        boxes = extract_boxes_from_image(image, file_type=file_type)
 
-    # Validate boxes were extracted
-    if not boxes:
-        logger.error("No boxes detected in the schedule image")
-        raise ValueError("No schedule table detected. Please ensure the PDF contains a valid weekly schedule table.")
+        # Validate boxes were extracted
+        if not boxes:
+            logger.error("No boxes detected in the schedule image")
+            raise ValueError("No schedule table detected. Please ensure the PDF contains a valid weekly schedule table.")
 
-    subjects = get_subjects_data(boxes, image)
+        subjects = get_subjects_data(boxes, image)
 
-    # Validate subjects were extracted
-    if not subjects:
-        logger.error(f"No subjects extracted from {len(boxes)} boxes")
-        raise ValueError("No course information could be extracted. The schedule format may not be supported.")
+        # Validate subjects were extracted
+        if not subjects:
+            logger.error(f"No subjects extracted from {len(boxes)} boxes")
+            raise ValueError("No course information could be extracted. The schedule format may not be supported.")
 
-    courses = create_courses(subjects)
+        courses = create_courses(subjects)
 
-    # Validate courses were created
-    if not courses:
-        logger.error(f"No courses created from {len(subjects)} subjects")
-        raise ValueError("Failed to parse course information. The schedule format may be invalid.")
+        # Validate courses were created
+        if not courses:
+            logger.error(f"No courses created from {len(subjects)} subjects")
+            raise ValueError("Failed to parse course information. The schedule format may be invalid.")
 
-    logger.info("Generating ICS calendar")
-    calendar = create_schedule_ics(courses)
+        logger.info("Generating ICS calendar")
+        calendar = create_schedule_ics(courses)
 
-    logger.info(f"Parse workflow completed successfully: {len(courses)} courses")
-    return calendar
+        logger.info(f"Parse workflow completed successfully: {len(courses)} courses")
+        return calendar
+    finally:
+        # Clean up resources
+        if image is not None:
+            try:
+                image.close()
+                logger.debug("Closed PIL Image resource")
+            except Exception as e:
+                logger.warning(f"Error closing image: {e}")
+
+        if file_buffer is not None:
+            try:
+                file_buffer.close()
+                logger.debug("Closed BytesIO buffer")
+            except Exception as e:
+                logger.warning(f"Error closing buffer: {e}")
