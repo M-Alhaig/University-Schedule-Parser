@@ -54,6 +54,15 @@ class Config:
     DETECTION_KEYWORD = os.getenv("DETECTION_KEYWORD", "THURSDAY")
     KEYWORD_PADDING = int(os.getenv("KEYWORD_PADDING", 100))
 
+    # PDF line drawing (previously hardcoded in ParsePDF.py)
+    PDF_LINE_TOP_OFFSET = int(os.getenv("PDF_LINE_TOP_OFFSET", 10))  # Offset from keyword top
+    PDF_LINE_EXTENSION = int(os.getenv("PDF_LINE_EXTENSION", 1300))  # How far down to extend line
+
+    # Box matching tolerance (previously hardcoded in Parse.py)
+    DAY_BOX_TOLERANCE = int(os.getenv("DAY_BOX_TOLERANCE", 10))  # Pixel tolerance for matching day columns
+    MAX_DAYS_TO_DETECT = int(os.getenv("MAX_DAYS_TO_DETECT", 5))  # Max number of day columns to find
+    BOX_WIDTH_ADJUSTMENT = int(os.getenv("BOX_WIDTH_ADJUSTMENT", 2))  # Width adjustment for OCR boxes
+
     # Threading
     MAX_WORKERS = int(os.getenv("MAX_WORKERS", 8))
 
@@ -67,6 +76,12 @@ class Config:
 
     # API Settings
     CALENDAR_FILENAME = os.getenv("CALENDAR_FILENAME", "calendar.ics")
+
+    # CORS Settings
+    ALLOWED_ORIGINS = os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://zocq7dcly5.execute-api.me-central-1.amazonaws.com,https://schedule-parser.malhaig.online"
+    ).split(",")
 
 
 # Singleton instance

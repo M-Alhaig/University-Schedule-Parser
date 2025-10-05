@@ -114,13 +114,14 @@ def draw_pdf_line(doc: BytesIO) -> BytesIO:
         )
 
     x_right = float(bbox["x1"]) + config.KEYWORD_PADDING
-    top = float(bbox["top"]) - 10
+    top = float(bbox["top"]) - config.PDF_LINE_TOP_OFFSET
     bottom = float(bbox["bottom"])
-    logger.debug(f"Drawing line from ({x_right}, {top}) to ({x_right}, {bottom + 1300})")
+    line_end = bottom + config.PDF_LINE_EXTENSION
+    logger.debug(f"Drawing line from ({x_right}, {top}) to ({x_right}, {line_end})")
 
     doc = fitz.open(stream=doc, filetype="pdf")
     page = doc.load_page(0)
-    page.draw_line(p1=(x_right, top), p2=(x_right, bottom + 1300), color=(0, 0, 0), width=1)
+    page.draw_line(p1=(x_right, top), p2=(x_right, line_end), color=(0, 0, 0), width=1)
     pdf_bytes = doc.write()
     pdf_buffer = BytesIO(pdf_bytes)
     logger.info("Successfully drew separator line")

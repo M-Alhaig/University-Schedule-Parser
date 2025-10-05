@@ -25,11 +25,13 @@ logger.info("Starting FastAPI application")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+logger.info(f"CORS configured with allowed origins: {config.ALLOWED_ORIGINS}")
 
 @app.get("/")
 async def root():

@@ -183,7 +183,7 @@ def get_bbox_days_times(
 
     for box in boxes:
 
-        if len(day_boxes) == 5 and time_x is not None:
+        if len(day_boxes) == config.MAX_DAYS_TO_DETECT and time_x is not None:
             break
 
         x, y, w, h = box
@@ -207,7 +207,7 @@ def get_bbox_days_times(
 def extract_single_box(args: Tuple[Tuple[int, int, int, int], Image.Image, Optional[int], Optional[int], Optional[str]]) -> Optional[Dict[str, Any]]:
     box, image, time_x, time_w, day = args
     x, y, w, h = box
-    w = w + 2
+    w = w + config.BOX_WIDTH_ADJUSTMENT
 
     # Crop image and prepare it
     crop = image.crop((x, y, x + w, y + h))
@@ -251,7 +251,7 @@ def get_subjects_data(
         # Find the day for this box
         day = None
         for day_box in day_boxes:
-            if abs(day_box[0][0] - x) < 10:
+            if abs(day_box[0][0] - x) < config.DAY_BOX_TOLERANCE:
                 day = day_box[1]
                 break
 
