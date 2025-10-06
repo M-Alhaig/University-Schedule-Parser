@@ -11,6 +11,7 @@ class Config:
 
     # File validation
     MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10MB default
+    MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", 10))  # Maximum pages in PDF
     ALLOWED_CONTENT_TYPES = os.getenv("ALLOWED_CONTENT_TYPES", "application/pdf").split(",")
 
     # PDF Processing - Dynamic Table Boundary Detection

@@ -15,6 +15,63 @@ from app.config import config
 
 logger = logging.getLogger(__name__)
 
+# PDF magic number signature
+PDF_MAGIC_NUMBERS = [b'%PDF-1.', b'%PDF-2.']
+
+
+def validate_pdf_file(pdf_stream: BytesIO) -> None:
+    """
+    Validate PDF file structure and constraints.
+
+    Args:
+        pdf_stream: PDF file as BytesIO
+
+    Raises:
+        HTTPException: If validation fails
+    """
+    # Check for PDF magic number
+    pdf_stream.seek(0)
+    header = pdf_stream.read(8)
+    pdf_stream.seek(0)  # Reset position
+
+    is_valid_pdf = any(header.startswith(magic) for magic in PDF_MAGIC_NUMBERS)
+    if not is_valid_pdf:
+        logger.warning(f"Invalid PDF header: {header[:20]}")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid PDF file. The file does not appear to be a valid PDF document."
+        )
+
+    # Validate page count
+    try:
+        doc = fitz.open(stream=pdf_stream, filetype="pdf")
+        page_count = doc.page_count
+        doc.close()
+        pdf_stream.seek(0)  # Reset position
+
+        if page_count > config.MAX_PDF_PAGES:
+            logger.warning(f"PDF has {page_count} pages, exceeds limit of {config.MAX_PDF_PAGES}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"PDF has too many pages ({page_count}). Maximum allowed is {config.MAX_PDF_PAGES} pages."
+            )
+
+        if page_count == 0:
+            logger.warning("PDF has 0 pages")
+            raise HTTPException(
+                status_code=400,
+                detail="PDF file appears to be empty or corrupted."
+            )
+
+        logger.info(f"PDF validation passed: {page_count} page(s)")
+
+    except fitz.FileDataError as e:
+        logger.error(f"PDF structure error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="PDF file is corrupted or has an invalid structure."
+        )
+
 
 def detect_vertical_lines(image: Image.Image) -> List[Tuple[int, int, int, int]]:
     """
@@ -351,6 +408,10 @@ def pdf_to_images(pdf_data: BytesIO) -> List[Image.Image]:
 
 def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
     logger.info(f"Handling PDF with {browser} browser settings")
+
+    # Validate PDF before processing
+    validate_pdf_file(pdf_stream)
+
     try:
         doc = fitz.open(stream=pdf_stream, filetype="pdf")
         image, file_type = process_pdf(doc, browser=browser)
