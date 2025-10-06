@@ -4,19 +4,59 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import logging
 import sys
+import json
+from datetime import datetime
 
 from app.Parse import parse
 from app.config import config
 from app.metrics import metrics, track_time
 
-# Configure root logger
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+
+class JsonFormatter(logging.Formatter):
+    """
+    Custom JSON formatter for structured logging in production.
+    Outputs logs as JSON for better parsing in CloudWatch Logs Insights.
+    """
+    def format(self, record: logging.LogRecord) -> str:
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # Add extra fields if present
+        if hasattr(record, "extra"):
+            log_data.update(record.extra)
+
+        return json.dumps(log_data)
+
+
+# Configure root logger based on environment
+if config.LOG_FORMAT == "json":
+    # JSON format for production/Lambda
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter())
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[handler]
+    )
+else:
+    # Human-readable format for development
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 
 app = FastAPI()
 
@@ -52,6 +92,13 @@ async def health_check():
 async def get_metrics():
     """Get current metrics statistics"""
     stats = metrics.get_stats()
+    return stats
+
+
+@app.get("/metrics/detailed")
+async def get_detailed_metrics():
+    """Get detailed metrics with stage-level breakdown and percentiles"""
+    stats = metrics.get_detailed_stats()
     return stats
 
 

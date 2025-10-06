@@ -5,15 +5,16 @@ Metrics are logged and can be sent to CloudWatch
 import logging
 import time
 from functools import wraps
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, List
 from datetime import datetime
 import json
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
 class Metrics:
-    """Simple metrics collector"""
+    """Simple metrics collector with stage-level performance tracking"""
 
     def __init__(self):
         self.metrics: Dict[str, Any] = {
@@ -22,6 +23,11 @@ class Metrics:
             "requests_failed": 0,
             "processing_times": [],
             "errors": [],
+            # Stage-specific timings
+            "pdf_processing_times": [],
+            "box_extraction_times": [],
+            "ocr_processing_times": [],
+            "calendar_generation_times": [],
         }
 
     def increment(self, metric_name: str, value: int = 1):
@@ -48,6 +54,18 @@ class Metrics:
         self.metrics["errors"].append(error_entry)
         logger.info(f"Error recorded: {error_type} - {error_message}")
 
+    def _calculate_percentiles(self, times: List[float]) -> Dict[str, float]:
+        """Calculate percentiles for timing data"""
+        if not times:
+            return {}
+
+        times_array = np.array(times)
+        return {
+            "p50": float(np.percentile(times_array, 50)),
+            "p95": float(np.percentile(times_array, 95)),
+            "p99": float(np.percentile(times_array, 99)),
+        }
+
     def get_stats(self) -> Dict[str, Any]:
         """Get current metrics statistics"""
         stats = {
@@ -71,6 +89,45 @@ class Metrics:
 
         # Recent errors
         stats["recent_errors_count"] = len(self.metrics.get("errors", []))
+
+        return stats
+
+    def get_detailed_stats(self) -> Dict[str, Any]:
+        """Get detailed metrics with stage-level breakdown and percentiles"""
+        stats = self.get_stats()
+
+        # Add stage-specific timing breakdowns
+        stages = {
+            "pdf_processing": self.metrics.get("pdf_processing_times", []),
+            "box_extraction": self.metrics.get("box_extraction_times", []),
+            "ocr_processing": self.metrics.get("ocr_processing_times", []),
+            "calendar_generation": self.metrics.get("calendar_generation_times", []),
+        }
+
+        stage_stats = {}
+        for stage_name, times in stages.items():
+            if times:
+                stage_stats[stage_name] = {
+                    "count": len(times),
+                    "avg_ms": sum(times) / len(times),
+                    "min_ms": min(times),
+                    "max_ms": max(times),
+                    **self._calculate_percentiles(times)
+                }
+            else:
+                stage_stats[stage_name] = {
+                    "count": 0,
+                    "avg_ms": 0,
+                    "min_ms": 0,
+                    "max_ms": 0
+                }
+
+        stats["stages"] = stage_stats
+
+        # Add overall percentiles
+        processing_times = self.metrics.get("processing_times", [])
+        if processing_times:
+            stats["percentiles"] = self._calculate_percentiles(processing_times)
 
         return stats
 
