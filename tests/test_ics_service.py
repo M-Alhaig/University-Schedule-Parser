@@ -1,9 +1,12 @@
 """
 Unit tests for ICS Service module
 """
-import pytest
+
 from datetime import datetime, timedelta
-from app.IcsService import parse_duration, create_schedule_ics
+
+import pytest
+
+from app.IcsService import create_schedule_ics, parse_duration
 from app.Parse import Course
 
 
@@ -51,8 +54,8 @@ class TestCreateScheduleICS:
         courses = []
         ics_bytes = create_schedule_ics(courses)
         assert ics_bytes is not None
-        assert b'BEGIN:VCALENDAR' in ics_bytes
-        assert b'END:VCALENDAR' in ics_bytes
+        assert b"BEGIN:VCALENDAR" in ics_bytes
+        assert b"END:VCALENDAR" in ics_bytes
 
     def test_create_single_course_calendar(self):
         """Test creating calendar with single course"""
@@ -65,16 +68,16 @@ class TestCreateScheduleICS:
                 campus="Main",
                 room="201",
                 day="MONDAY",
-                duration="08:00-09:30"
+                duration="08:00-09:30",
             )
         ]
         ics_bytes = create_schedule_ics(courses)
 
-        assert b'BEGIN:VCALENDAR' in ics_bytes
-        assert b'BEGIN:VEVENT' in ics_bytes
-        assert b'Test Course' in ics_bytes
-        assert b'TC101' in ics_bytes
-        assert b'RRULE:FREQ=WEEKLY' in ics_bytes
+        assert b"BEGIN:VCALENDAR" in ics_bytes
+        assert b"BEGIN:VEVENT" in ics_bytes
+        assert b"Test Course" in ics_bytes
+        assert b"TC101" in ics_bytes
+        assert b"RRULE:FREQ=WEEKLY" in ics_bytes
 
     def test_create_multiple_courses_calendar(self):
         """Test creating calendar with multiple courses"""
@@ -86,29 +89,27 @@ class TestCreateScheduleICS:
         ics_bytes = create_schedule_ics(courses)
 
         # Should have 3 events
-        assert ics_bytes.count(b'BEGIN:VEVENT') == 3
-        assert ics_bytes.count(b'END:VEVENT') == 3
+        assert ics_bytes.count(b"BEGIN:VEVENT") == 3
+        assert ics_bytes.count(b"END:VEVENT") == 3
 
-        assert b'Math' in ics_bytes
-        assert b'Physics' in ics_bytes
-        assert b'Chemistry' in ics_bytes
+        assert b"Math" in ics_bytes
+        assert b"Physics" in ics_bytes
+        assert b"Chemistry" in ics_bytes
 
     def test_calendar_structure(self):
         """Test ICS calendar has proper structure"""
-        courses = [
-            Course(name="Test", day="FRIDAY", duration="13:00-14:00")
-        ]
+        courses = [Course(name="Test", day="FRIDAY", duration="13:00-14:00")]
         ics_bytes = create_schedule_ics(courses)
-        ics_string = ics_bytes.decode('utf-8')
+        ics_string = ics_bytes.decode("utf-8")
 
         # Check required ICS components
-        assert 'BEGIN:VCALENDAR' in ics_string
-        assert 'VERSION:2.0' in ics_string
-        assert 'PRODID:-//University Schedule//' in ics_string
-        assert 'BEGIN:VEVENT' in ics_string
-        assert 'SUMMARY:Test' in ics_string
-        assert 'DTSTART' in ics_string
-        assert 'DTEND' in ics_string
-        assert 'RRULE:FREQ=WEEKLY' in ics_string
-        assert 'END:VEVENT' in ics_string
-        assert 'END:VCALENDAR' in ics_string
+        assert "BEGIN:VCALENDAR" in ics_string
+        assert "VERSION:2.0" in ics_string
+        assert "PRODID:-//University Schedule//" in ics_string
+        assert "BEGIN:VEVENT" in ics_string
+        assert "SUMMARY:Test" in ics_string
+        assert "DTSTART" in ics_string
+        assert "DTEND" in ics_string
+        assert "RRULE:FREQ=WEEKLY" in ics_string
+        assert "END:VEVENT" in ics_string
+        assert "END:VCALENDAR" in ics_string

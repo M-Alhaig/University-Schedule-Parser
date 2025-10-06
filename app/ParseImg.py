@@ -1,11 +1,13 @@
-import numpy as np
-from PIL import Image
-import pytesseract
-from pytesseract import Output
-import cv2
 import logging
-from typing import Tuple, Union
 from io import BytesIO
+from typing import Tuple, Union
+
+import cv2
+import numpy as np
+import pytesseract
+from PIL import Image
+from pytesseract import Output
+
 from app.config import config
 
 logger = logging.getLogger(__name__)
@@ -36,10 +38,10 @@ def handle_img(img: Union[BytesIO, Image.Image], browser: str = "CHROME") -> Tup
     # Find THURSDAY keyword position
     thursday_y = None
     thursday_x = None
-    for i, word in enumerate(data['text']):
+    for i, word in enumerate(data["text"]):
         if word.strip().lower() == keyword.lower():
-            thursday_x = data['left'][i] + data['width'][i]
-            thursday_y = data['top'][i] + data['height'][i]
+            thursday_x = data["left"][i] + data["width"][i]
+            thursday_y = data["top"][i] + data["height"][i]
             logger.info(f"Found keyword '{keyword}' at position ({data['left'][i]}, {data['top'][i]})")
             break
 

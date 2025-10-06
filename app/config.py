@@ -2,6 +2,7 @@
 Configuration settings for FastAPI Schedule Parser
 Supports environment variable overrides
 """
+
 import os
 from typing import Dict, Literal
 
@@ -78,8 +79,7 @@ class Config:
 
     # CORS Settings
     ALLOWED_ORIGINS = os.getenv(
-        "ALLOWED_ORIGINS",
-        "https://zocq7dcly5.execute-api.me-central-1.amazonaws.com,https://schedule-parser.malhaig.online"
+        "ALLOWED_ORIGINS", "https://zocq7dcly5.execute-api.me-central-1.amazonaws.com,https://schedule-parser.malhaig.online"
     ).split(",")
 
 

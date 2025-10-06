@@ -2,12 +2,14 @@
 Simple metrics collection for monitoring
 Metrics are logged and can be sent to CloudWatch
 """
+
+import json
 import logging
 import time
-from functools import wraps
-from typing import Dict, Any, Callable, List
 from datetime import datetime
-import json
+from functools import wraps
+from typing import Any, Callable, Dict, List
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -47,11 +49,7 @@ class Metrics:
 
     def record_error(self, error_type: str, error_message: str):
         """Record an error"""
-        error_entry = {
-            "type": error_type,
-            "message": error_message,
-            "timestamp": datetime.now().isoformat()
-        }
+        error_entry = {"type": error_type, "message": error_message, "timestamp": datetime.now().isoformat()}
         self.metrics["errors"].append(error_entry)
         logger.info(f"Error recorded: {error_type} - {error_message}")
 
@@ -113,15 +111,10 @@ class Metrics:
                     "avg_ms": sum(times) / len(times),
                     "min_ms": min(times),
                     "max_ms": max(times),
-                    **self._calculate_percentiles(times)
+                    **self._calculate_percentiles(times),
                 }
             else:
-                stage_stats[stage_name] = {
-                    "count": 0,
-                    "avg_ms": 0,
-                    "min_ms": 0,
-                    "max_ms": 0
-                }
+                stage_stats[stage_name] = {"count": 0, "avg_ms": 0, "min_ms": 0, "max_ms": 0}
 
         stats["stages"] = stage_stats
 
@@ -166,7 +159,7 @@ class Metrics:
             "timestamp": datetime.now().isoformat(),
             "status": status,
             "duration_ms": duration_ms,
-            "error_type": error_type
+            "error_type": error_type,
         }
 
         self.metrics["request_history"].append(entry)
@@ -205,6 +198,7 @@ def track_time(metric_name: str = "processing_time"):
         async def process_pdf():
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -236,6 +230,7 @@ def track_time(metric_name: str = "processing_time"):
 
         # Return appropriate wrapper based on function type
         import inspect
+
         if inspect.iscoroutinefunction(func):
             return async_wrapper
         else:

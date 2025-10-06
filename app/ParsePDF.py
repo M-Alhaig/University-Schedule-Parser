@@ -1,22 +1,24 @@
+import logging
 import os
-from io import BytesIO
 import platform
-from typing import Tuple, List, Optional
+from io import BytesIO
+from typing import List, Optional, Tuple
+
+import cv2
 import fitz
+import numpy as np
 import pdfplumber
-from PIL import Image
 from fastapi import HTTPException
 from pdf2image import convert_from_bytes
-import logging
-import cv2
-import numpy as np
-from app.ParseImg import handle_img
+from PIL import Image
+
 from app.config import config
+from app.ParseImg import handle_img
 
 logger = logging.getLogger(__name__)
 
 # PDF magic number signature
-PDF_MAGIC_NUMBERS = [b'%PDF-1.', b'%PDF-2.']
+PDF_MAGIC_NUMBERS = [b"%PDF-1.", b"%PDF-2."]
 
 
 def validate_pdf_file(pdf_stream: BytesIO) -> None:
@@ -37,10 +39,7 @@ def validate_pdf_file(pdf_stream: BytesIO) -> None:
     is_valid_pdf = any(header.startswith(magic) for magic in PDF_MAGIC_NUMBERS)
     if not is_valid_pdf:
         logger.warning(f"Invalid PDF header: {header[:20]}")
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid PDF file. The file does not appear to be a valid PDF document."
-        )
+        raise HTTPException(status_code=400, detail="Invalid PDF file. The file does not appear to be a valid PDF document.")
 
     # Validate page count
     try:
@@ -53,24 +52,18 @@ def validate_pdf_file(pdf_stream: BytesIO) -> None:
             logger.warning(f"PDF has {page_count} pages, exceeds limit of {config.MAX_PDF_PAGES}")
             raise HTTPException(
                 status_code=400,
-                detail=f"PDF has too many pages ({page_count}). Maximum allowed is {config.MAX_PDF_PAGES} pages."
+                detail=f"PDF has too many pages ({page_count}). Maximum allowed is {config.MAX_PDF_PAGES} pages.",
             )
 
         if page_count == 0:
             logger.warning("PDF has 0 pages")
-            raise HTTPException(
-                status_code=400,
-                detail="PDF file appears to be empty or corrupted."
-            )
+            raise HTTPException(status_code=400, detail="PDF file appears to be empty or corrupted.")
 
         logger.info(f"PDF validation passed: {page_count} page(s)")
 
     except fitz.FileDataError as e:
         logger.error(f"PDF structure error: {e}")
-        raise HTTPException(
-            status_code=400,
-            detail="PDF file is corrupted or has an invalid structure."
-        )
+        raise HTTPException(status_code=400, detail="PDF file is corrupted or has an invalid structure.")
 
 
 def detect_vertical_lines(image: Image.Image) -> List[Tuple[int, int, int, int]]:
@@ -212,14 +205,14 @@ def find_duplicate_days_row(page_image: Image.Image) -> Optional[int]:
 
     # Find any day name and get its bounding box
     day_found = False
-    min_y = float('inf')
+    min_y = float("inf")
     max_y = 0
 
-    for i, word in enumerate(data['text']):
+    for i, word in enumerate(data["text"]):
         if word.strip().upper() in DAYS:
             day_found = True
-            word_top = data['top'][i]
-            word_bottom = data['top'][i] + data['height'][i]
+            word_top = data["top"][i]
+            word_bottom = data["top"][i] + data["height"][i]
             min_y = min(min_y, word_top)
             max_y = max(max_y, word_bottom)
             logger.debug(f"Found day '{word}' at y={word_top}-{word_bottom}")
@@ -381,6 +374,7 @@ def process_pdf(doc: fitz.Document, browser: str = "CHROME") -> Tuple[Image.Imag
     # Process through image handler (draws line on image)
     return handle_img(images[0], browser)
 
+
 def pdf_to_images(pdf_data: BytesIO) -> List[Image.Image]:
     """
     Convert PDF bytes to images.
@@ -406,6 +400,7 @@ def pdf_to_images(pdf_data: BytesIO) -> List[Image.Image]:
     logger.info(f"Converted PDF to {len(images)} image(s)")
     return images
 
+
 def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
     logger.info(f"Handling PDF with {browser} browser settings")
 
@@ -427,7 +422,4 @@ def handle_pdf(pdf_stream: BytesIO, browser: str) -> Tuple[Image.Image, str]:
         raise HTTPException(status_code=400, detail="Unable to process PDF. The file may be corrupted.")
     except Exception as e:
         logger.error(f"Unexpected error processing PDF - Type: {type(e).__name__}, Message: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=400,
-            detail="Unable to process PDF. Please ensure it's a valid schedule document."
-        )
+        raise HTTPException(status_code=400, detail="Unable to process PDF. Please ensure it's a valid schedule document.")

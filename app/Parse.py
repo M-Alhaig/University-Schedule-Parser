@@ -1,25 +1,27 @@
 import logging
 import os
+import platform
+import re
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
+
 import cv2
 import numpy as np
-from numpy.typing import NDArray
-import re
 import pytesseract
-from pydantic import BaseModel
-import platform
-from PIL import Image
 from fastapi import UploadFile
+from numpy.typing import NDArray
+from PIL import Image
+from pydantic import BaseModel
 
+from app.config import config
 from app.IcsService import create_schedule_ics
+from app.metrics import track_time
 from app.ParseImg import handle_img
 from app.ParsePDF import handle_pdf
-from app.config import config
-from app.metrics import track_time
 
 logger = logging.getLogger(__name__)
+
 
 class Course(BaseModel):
     name: str
@@ -30,7 +32,6 @@ class Course(BaseModel):
     room: str = ""
     day: str = ""
     duration: str
-
 
 
 if platform.system() == "Windows":
@@ -78,8 +79,7 @@ def calculate_iou(box: Tuple[int, int, int, int], filtered_box: Tuple[int, int, 
 
 
 def filter_duplicate_boxes(
-    boxes: List[Tuple[int, int, int, int]],
-    iou_threshold: float = 0.8
+    boxes: List[Tuple[int, int, int, int]], iou_threshold: float = 0.8
 ) -> List[Tuple[int, int, int, int]]:
     """
     Filter out duplicate bounding boxes using IoU threshold.
@@ -111,10 +111,7 @@ def filter_duplicate_boxes(
 
 
 @track_time("box_extraction_times")
-def extract_boxes_from_image(
-    image: Image.Image,
-    file_type: str = "PDF"
-) -> List[Tuple[int, int, int, int]]:
+def extract_boxes_from_image(image: Image.Image, file_type: str = "PDF") -> List[Tuple[int, int, int, int]]:
     logger.info(f"Extracting boxes from {file_type} image")
     img = np.array(image)
     if len(img.shape) == 3:
@@ -145,7 +142,9 @@ def extract_boxes_from_image(
 
     boxes = []
     image_copy = np.array(image.copy())
-    area_threshold = config.BOX_EXTRACTION["area_threshold_pdf"] if file_type == "PDF" else config.BOX_EXTRACTION["area_threshold_image"]
+    area_threshold = (
+        config.BOX_EXTRACTION["area_threshold_pdf"] if file_type == "PDF" else config.BOX_EXTRACTION["area_threshold_image"]
+    )
 
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
@@ -156,7 +155,10 @@ def extract_boxes_from_image(
             continue
         if area < area_threshold or area > config.BOX_EXTRACTION["max_area"]:
             continue
-        if aspect_ratio < config.BOX_EXTRACTION["min_aspect_ratio"] or aspect_ratio > config.BOX_EXTRACTION["max_aspect_ratio"]:
+        if (
+            aspect_ratio < config.BOX_EXTRACTION["min_aspect_ratio"]
+            or aspect_ratio > config.BOX_EXTRACTION["max_aspect_ratio"]
+        ):
             continue
 
         boxes.append((x, y, w, h))
@@ -181,8 +183,7 @@ def extract_boxes_from_image(
 
 
 def get_bbox_days_times(
-    boxes: List[Tuple[int, int, int, int]],
-    image: Image.Image
+    boxes: List[Tuple[int, int, int, int]], image: Image.Image
 ) -> Tuple[List[Tuple[Tuple[int, int, int, int], str]], Optional[int], Optional[int]]:
     DAYS = config.DAYS_ENGLISH + config.DAYS_FRENCH
     logger.info("Detecting day and time boxes")
@@ -213,7 +214,9 @@ def get_bbox_days_times(
     return day_boxes, time_x, time_w
 
 
-def extract_single_box(args: Tuple[Tuple[int, int, int, int], Image.Image, Optional[int], Optional[int], Optional[str]]) -> Optional[Dict[str, Any]]:
+def extract_single_box(
+    args: Tuple[Tuple[int, int, int, int], Image.Image, Optional[int], Optional[int], Optional[str]],
+) -> Optional[Dict[str, Any]]:
     box, image, time_x, time_w, day = args
     x, y, w, h = box
     w = w + config.BOX_WIDTH_ADJUSTMENT
@@ -235,28 +238,21 @@ def extract_single_box(args: Tuple[Tuple[int, int, int, int], Image.Image, Optio
     # Examples: "08:00 - 09:00", "08:00-09:00", "08:00 09:00", "08:00- -09:50"
     time_parts = time.split()
     # Remove dashes that might be standalone tokens
-    time_parts = [t for t in time_parts if t != '-']
+    time_parts = [t for t in time_parts if t != "-"]
     # Strip leading/trailing dashes from each part (OCR artifacts)
-    time_parts = [t.strip('-') for t in time_parts]
+    time_parts = [t.strip("-") for t in time_parts]
     # Remove empty strings after stripping
     time_parts = [t for t in time_parts if t]
     # If we have a single token, try splitting by dash
-    if len(time_parts) == 1 and '-' in time_parts[0]:
-        time_parts = time_parts[0].split('-')
+    if len(time_parts) == 1 and "-" in time_parts[0]:
+        time_parts = time_parts[0].split("-")
         time_parts = [t.strip() for t in time_parts if t.strip()]
 
-    subject = {
-        "details": " ".join(subject_details.split()),
-        "day": day if day else "",
-        "time": time_parts
-    }
+    subject = {"details": " ".join(subject_details.split()), "day": day if day else "", "time": time_parts}
     return subject
 
 
-def get_subjects_data(
-    boxes: List[Tuple[int, int, int, int]],
-    image: Image.Image
-) -> List[Dict[str, Any]]:
+def get_subjects_data(boxes: List[Tuple[int, int, int, int]], image: Image.Image) -> List[Dict[str, Any]]:
     logger.info("Extracting subjects data")
     day_boxes, time_x, time_w = get_bbox_days_times(boxes, image)
 
@@ -313,6 +309,7 @@ def get_subjects_data(
     logger.info(f"Successfully extracted {len(subjects)} subjects")
     return subjects
 
+
 def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
     """
     Create Course objects from extracted subject data.
@@ -338,7 +335,7 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
         # If we have only 1 part and it contains a dash, use it as-is
         if len(time_parts) >= 2:
             duration = f"{time_parts[0]}-{time_parts[-1]}"
-        elif len(time_parts) == 1 and '-' in time_parts[0]:
+        elif len(time_parts) == 1 and "-" in time_parts[0]:
             duration = time_parts[0]
         else:
             logger.warning(f"Skipping subject {i+1} - invalid time format: {time_parts}")
@@ -355,7 +352,7 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
                 campus=match.group(5) if match.group(5) else "",
                 room=match.group(6) if match.group(6) else "",
                 day=subject["day"],
-                duration=duration
+                duration=duration,
             )
             subject_objects.append(subject_object)
         else:
@@ -366,6 +363,7 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
 
 
 # Wrapper functions with timing decorators
+
 
 @track_time("pdf_processing_times")
 def process_file_to_image(file_buffer: BytesIO, browser: str, content_type: str) -> Tuple[Image.Image, str]:

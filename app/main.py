@@ -1,18 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
-
-from fastapi.responses import JSONResponse, Response, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
-import logging
-import sys
 import json
-from datetime import datetime
+import logging
 import os
+import sys
 import time
+from datetime import datetime
 
-from app.Parse import parse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
+from mangum import Mangum
+
 from app.config import config
 from app.metrics import metrics, track_time
+from app.Parse import parse
 
 
 class JsonFormatter(logging.Formatter):
@@ -20,6 +20,7 @@ class JsonFormatter(logging.Formatter):
     Custom JSON formatter for structured logging in production.
     Outputs logs as JSON for better parsing in CloudWatch Logs Insights.
     """
+
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -47,18 +48,13 @@ if config.LOG_FORMAT == "json":
     # JSON format for production/Lambda
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
-    logging.basicConfig(
-        level=logging.INFO,
-        handlers=[handler]
-    )
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
 else:
     # Human-readable format for development
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
 app = FastAPI()
@@ -76,6 +72,7 @@ app.add_middleware(
 
 logger.info(f"CORS configured with allowed origins: {config.ALLOWED_ORIGINS}")
 
+
 @app.get("/")
 async def root():
     logger.info("Called root route")
@@ -85,10 +82,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    return {
-        "status": "healthy",
-        "service": "schedule-parser"
-    }
+    return {"status": "healthy", "service": "schedule-parser"}
 
 
 @app.get("/metrics")
@@ -119,20 +113,19 @@ async def dashboard():
     if os.path.exists(dashboard_path):
         return FileResponse(dashboard_path)
     else:
-        return JSONResponse(
-            content={"error": "Dashboard not found"},
-            status_code=404
-        )
+        return JSONResponse(content={"error": "Dashboard not found"}, status_code=404)
 
 
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
 
+
 # My catch all code
 @app.api_route("/{path_name:path}", methods=["GET"])
 async def catch_all(request: Request, path_name: str):
-   return {"request_method": request.method, "path_name": path_name}
+    return {"request_method": request.method, "path_name": path_name}
+
 
 @app.post("/parse")
 @track_time("parse_request")
@@ -174,21 +167,17 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
         metrics.log_metrics()
 
         return Response(
-        content=response,
-        media_type="text/calendar",
-        headers={
-            "Content-Disposition": f"attachment; filename={config.CALENDAR_FILENAME}"
-        })
+            content=response,
+            media_type="text/calendar",
+            headers={"Content-Disposition": f"attachment; filename={config.CALENDAR_FILENAME}"},
+        )
     except ValueError as e:
         duration_ms = (time.time() - start_time) * 1000
         logger.warning(f"Validation error while parsing {file.filename}: {e}")
         metrics.increment("requests_failed")
         metrics.record_error("validation_error", str(e))
         metrics.add_request_to_history("failed", duration_ms, "validation_error")
-        return JSONResponse(
-            content={"error": "Validation error", "message": "Invalid input data"},
-            status_code=400
-        )
+        return JSONResponse(content={"error": "Validation error", "message": "Invalid input data"}, status_code=400)
     except HTTPException as e:
         duration_ms = (time.time() - start_time) * 1000
         # Re-raise HTTP exceptions (like from ParsePDF)
@@ -204,9 +193,12 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
         metrics.record_error("internal_error", str(e))
         metrics.add_request_to_history("failed", duration_ms, "internal_error")
         return JSONResponse(
-            content={"error": "Internal server error", "message": "Failed to process the file. Please ensure it's a valid schedule PDF."},
-            status_code=500
+            content={
+                "error": "Internal server error",
+                "message": "Failed to process the file. Please ensure it's a valid schedule PDF.",
+            },
+            status_code=500,
         )
 
-handler = Mangum(app)
 
+handler = Mangum(app)

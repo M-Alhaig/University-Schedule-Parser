@@ -2,14 +2,15 @@
 Integration tests for the schedule parser
 These tests use real PDF files from CHROME_EX and FIREFOX_EX directories
 """
-import pytest
-import os
-from pathlib import Path
-from io import BytesIO
-from PIL import Image
-import numpy as np
-from unittest.mock import Mock, patch, AsyncMock
 
+import os
+from io import BytesIO
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import numpy as np
+import pytest
+from PIL import Image
 
 # Check if test PDFs exist in CHROME_EX and FIREFOX_EX
 BASE_DIR = Path(__file__).parent.parent
@@ -38,7 +39,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(CHROME_PORTRAIT.glob("*.pdf"))
         test_file = pdf_files[0]  # Test with first PDF
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             pdf_bytes = BytesIO(f.read())
             image, file_type = handle_pdf(pdf_bytes, "CHROME")
 
@@ -55,7 +56,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(CHROME_LANDSCAPE.glob("*.pdf"))
         test_file = pdf_files[0]
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             pdf_bytes = BytesIO(f.read())
             image, file_type = handle_pdf(pdf_bytes, "CHROME")
 
@@ -72,7 +73,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(FIREFOX_PORTRAIT.glob("*.pdf"))
         test_file = pdf_files[0]
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             pdf_bytes = BytesIO(f.read())
             image, file_type = handle_pdf(pdf_bytes, "FIREFOX")
 
@@ -89,7 +90,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(FIREFOX_LANDSCAPE.glob("*.pdf"))
         test_file = pdf_files[0]
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             pdf_bytes = BytesIO(f.read())
             image, file_type = handle_pdf(pdf_bytes, "FIREFOX")
 
@@ -107,7 +108,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(CHROME_PORTRAIT.glob("*.pdf"))
         test_file = pdf_files[0]
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             mock_file = Mock()
             mock_file.read = AsyncMock(return_value=f.read())
             mock_file.content_type = "application/pdf"
@@ -116,8 +117,8 @@ class TestIntegrationWithRealPDFs:
                 result = await parse(mock_file, "CHROME")
                 assert result is not None
                 assert isinstance(result, bytes)
-                assert b'BEGIN:VCALENDAR' in result
-                assert b'END:VCALENDAR' in result
+                assert b"BEGIN:VCALENDAR" in result
+                assert b"END:VCALENDAR" in result
                 print(f"✓ E2E Chrome Portrait: {test_file.name} -> Generated ICS calendar")
             except ValueError as e:
                 # Expected if PDF format is not supported or has no valid schedule
@@ -134,7 +135,7 @@ class TestIntegrationWithRealPDFs:
         pdf_files = list(FIREFOX_PORTRAIT.glob("*.pdf"))
         test_file = pdf_files[0]
 
-        with open(test_file, 'rb') as f:
+        with open(test_file, "rb") as f:
             mock_file = Mock()
             mock_file.read = AsyncMock(return_value=f.read())
             mock_file.content_type = "application/pdf"
@@ -143,8 +144,8 @@ class TestIntegrationWithRealPDFs:
                 result = await parse(mock_file, "FIREFOX")
                 assert result is not None
                 assert isinstance(result, bytes)
-                assert b'BEGIN:VCALENDAR' in result
-                assert b'END:VCALENDAR' in result
+                assert b"BEGIN:VCALENDAR" in result
+                assert b"END:VCALENDAR" in result
                 print(f"✓ E2E Firefox Portrait: {test_file.name} -> Generated ICS calendar")
             except ValueError as e:
                 # Expected if PDF format is not supported or has no valid schedule
@@ -160,31 +161,32 @@ class TestIntegrationWithMockData:
     @pytest.mark.asyncio
     async def test_parse_workflow_with_mock_pdf(self):
         """Test parsing workflow with minimal mocking"""
-        from app.Parse import parse
         from PIL import Image
+
+        from app.Parse import parse
 
         # Create a simple test image
         img_array = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        test_image = Image.fromarray(img_array, 'RGB')
+        test_image = Image.fromarray(img_array, "RGB")
 
         mock_file = Mock()
         mock_file.read = AsyncMock(return_value=b"fake pdf content")
         mock_file.content_type = "application/pdf"
 
-        with patch('app.Parse.process_file_to_image', return_value=(test_image, "PDF")), \
-             patch('app.Parse.extract_boxes_from_image', return_value=[(10, 10, 100, 100)]), \
-             patch('app.Parse.extract_and_create_courses') as mock_courses_extract, \
-             patch('app.Parse.generate_calendar') as mock_calendar:
+        with patch("app.Parse.process_file_to_image", return_value=(test_image, "PDF")), patch(
+            "app.Parse.extract_boxes_from_image", return_value=[(10, 10, 100, 100)]
+        ), patch("app.Parse.extract_and_create_courses") as mock_courses_extract, patch(
+            "app.Parse.generate_calendar"
+        ) as mock_calendar:
 
             # Setup realistic mock data
             from app.Parse import Course
-            mock_courses_extract.return_value = [
-                Course(name="CS 101", id="CS101", day="MONDAY", duration="08:00-09:30")
-            ]
-            mock_calendar.return_value = b'BEGIN:VCALENDAR\r\nSUMMARY:CS 101\r\nRRULE:FREQ=WEEKLY\r\nEND:VCALENDAR'
+
+            mock_courses_extract.return_value = [Course(name="CS 101", id="CS101", day="MONDAY", duration="08:00-09:30")]
+            mock_calendar.return_value = b"BEGIN:VCALENDAR\r\nSUMMARY:CS 101\r\nRRULE:FREQ=WEEKLY\r\nEND:VCALENDAR"
 
             result = await parse(mock_file, "CHROME")
 
-            assert b'BEGIN:VCALENDAR' in result
-            assert b'CS 101' in result
-            assert b'RRULE:FREQ=WEEKLY' in result
+            assert b"BEGIN:VCALENDAR" in result
+            assert b"CS 101" in result
+            assert b"RRULE:FREQ=WEEKLY" in result

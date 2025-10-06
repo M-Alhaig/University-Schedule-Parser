@@ -1,11 +1,14 @@
 """
 Pytest configuration and fixtures
 """
+
+from io import BytesIO
+from unittest.mock import MagicMock, Mock
+
+import numpy as np
 import pytest
 from PIL import Image
-import numpy as np
-from io import BytesIO
-from unittest.mock import Mock, MagicMock
+
 from app.Parse import Course
 
 
@@ -20,7 +23,7 @@ def sample_course():
         campus="Main Campus",
         room="Building 1, Room 201",
         day="MONDAY",
-        duration="08:00-09:30"
+        duration="08:00-09:30",
     )
 
 
@@ -39,16 +42,16 @@ def sample_image():
     """Create a simple test image"""
     # Create a white 800x600 image
     img_array = np.ones((600, 800, 3), dtype=np.uint8) * 255
-    return Image.fromarray(img_array, 'RGB')
+    return Image.fromarray(img_array, "RGB")
 
 
 @pytest.fixture
 def sample_image_bytes():
     """Create test image as BytesIO"""
     img_array = np.ones((600, 800, 3), dtype=np.uint8) * 255
-    img = Image.fromarray(img_array, 'RGB')
+    img = Image.fromarray(img_array, "RGB")
     buffer = BytesIO()
-    img.save(buffer, format='PNG')
+    img.save(buffer, format="PNG")
     buffer.seek(0)
     return buffer
 
@@ -57,21 +60,20 @@ def sample_image_bytes():
 def mock_tesseract(monkeypatch):
     """Mock pytesseract calls to avoid dependency on actual Tesseract"""
     mock_image_to_string = Mock(return_value="MONDAY")
-    mock_image_to_data = Mock(return_value={
-        'text': ['', 'MONDAY', '', 'TUESDAY', '08:00'],
-        'left': [0, 50, 0, 250, 450],
-        'top': [0, 10, 0, 10, 10],
-        'width': [0, 100, 0, 100, 50],
-        'height': [0, 30, 0, 30, 20]
-    })
+    mock_image_to_data = Mock(
+        return_value={
+            "text": ["", "MONDAY", "", "TUESDAY", "08:00"],
+            "left": [0, 50, 0, 250, 450],
+            "top": [0, 10, 0, 10, 10],
+            "width": [0, 100, 0, 100, 50],
+            "height": [0, 30, 0, 30, 20],
+        }
+    )
 
-    monkeypatch.setattr('pytesseract.image_to_string', mock_image_to_string)
-    monkeypatch.setattr('pytesseract.image_to_data', mock_image_to_data)
+    monkeypatch.setattr("pytesseract.image_to_string", mock_image_to_string)
+    monkeypatch.setattr("pytesseract.image_to_data", mock_image_to_data)
 
-    return {
-        'image_to_string': mock_image_to_string,
-        'image_to_data': mock_image_to_data
-    }
+    return {"image_to_string": mock_image_to_string, "image_to_data": mock_image_to_data}
 
 
 @pytest.fixture
@@ -96,10 +98,10 @@ def mock_pdf_document(monkeypatch):
 def sample_boxes():
     """Sample bounding boxes for testing"""
     return [
-        (50, 10, 100, 30),    # Day box 1
-        (250, 10, 100, 30),   # Day box 2
-        (450, 10, 50, 20),    # Time box
-        (50, 100, 100, 40),   # Subject box 1
+        (50, 10, 100, 30),  # Day box 1
+        (250, 10, 100, 30),  # Day box 2
+        (450, 10, 50, 20),  # Time box
+        (50, 100, 100, 40),  # Subject box 1
         (250, 100, 100, 40),  # Subject box 2
     ]
 
@@ -111,11 +113,11 @@ def sample_subjects():
         {
             "details": "MATH 101 ID: MTH101 Activity: Lecture Section: A Campus: Main Room: 201",
             "day": "MONDAY",
-            "time": ["08:00", "09:30"]
+            "time": ["08:00", "09:30"],
         },
         {
             "details": "PHYS 201 ID: PHY201 Activity: Lab Section: B Campus: North Room: 305",
             "day": "TUESDAY",
-            "time": ["10:00", "11:30"]
-        }
+            "time": ["10:00", "11:30"],
+        },
     ]

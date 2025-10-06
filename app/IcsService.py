@@ -1,8 +1,10 @@
-from icalendar import Calendar, Event
-from datetime import datetime, time, timedelta
-from typing import Tuple, List, TYPE_CHECKING, Any
-import pytz
 import logging
+from datetime import datetime, time, timedelta
+from typing import TYPE_CHECKING, Any, List, Tuple
+
+import pytz
+from icalendar import Calendar, Event
+
 from app.config import config
 
 if TYPE_CHECKING:
@@ -13,17 +15,17 @@ logger = logging.getLogger(__name__)
 
 def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[datetime, datetime, Any]:
     days_map = {
-        "MONDAY":0,
-        "TUESDAY":1,
-        "WEDNESDAY":2,
-        "THURSDAY":3,
-        "FRIDAY":4,
-        "SATURDAY":5,
-        "SUNDAY":6,
+        "MONDAY": 0,
+        "TUESDAY": 1,
+        "WEDNESDAY": 2,
+        "THURSDAY": 3,
+        "FRIDAY": 4,
+        "SATURDAY": 5,
+        "SUNDAY": 6,
     }
     logger.debug(f"Parsing duration '{duration}' for {day} in {time_zone} timezone")
 
-    start, finish = duration.split('-')
+    start, finish = duration.split("-")
     target_day = days_map[day.upper()]
     today = datetime.today().weekday()
 
@@ -31,8 +33,8 @@ def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[dat
     if days_ahead < 0:
         days_ahead += 7
 
-    start_hour, start_minute = map(int,start.split(':'))
-    finish_hour, finish_minute = map(int, finish.split(':'))
+    start_hour, start_minute = map(int, start.split(":"))
+    finish_hour, finish_minute = map(int, finish.split(":"))
 
     date = datetime.today() + timedelta(days=days_ahead)
 
@@ -47,6 +49,7 @@ def parse_duration(duration: str, day: str, time_zone: str = "KSA") -> Tuple[dat
     end_time = timezone.localize(end_time)
 
     return start_time, end_time, timezone
+
 
 def create_schedule_ics(courses: List["Course"]) -> bytes:
     logger.info(f"Creating ICS calendar for {len(courses)} courses")
@@ -65,32 +68,28 @@ def create_schedule_ics(courses: List["Course"]) -> bytes:
     logger.info(f"Processing {len(valid_courses)} valid courses (skipped {len(courses) - len(valid_courses)} invalid)")
 
     cal = Calendar()
-    cal.add('prodid', '-//University Schedule//')
-    cal.add('version', '2.0')
+    cal.add("prodid", "-//University Schedule//")
+    cal.add("version", "2.0")
 
     for i, course in enumerate(valid_courses):
         event = Event()
         start_time, end_time, timezone = parse_duration(course.duration, course.day)
         until = (start_time + timedelta(weeks=config.SCHEDULE_DURATION_WEEKS)).replace(tzinfo=timezone)
 
-        event.add('summary', course.name)
+        event.add("summary", course.name)
 
-        event.add('description',
-                  f"Course ID: {course.id}\n"
-                  f"Activity: {course.activity}\n"
-                  f"Section: {course.section}")
+        event.add("description", f"Course ID: {course.id}\n" f"Activity: {course.activity}\n" f"Section: {course.section}")
 
-        event.add('dtstart', start_time)
-        event.add('dtend', end_time)
+        event.add("dtstart", start_time)
+        event.add("dtend", end_time)
 
-        event.add('rrule', {'freq': 'weekly', 'until': until})
+        event.add("rrule", {"freq": "weekly", "until": until})
 
-        event.add('uid',
-                  f"{course.id}-{course.section}-{course.duration}@university.edu")
+        event.add("uid", f"{course.id}-{course.section}-{course.duration}@university.edu")
 
-        event.add('dtstamp', datetime.now(timezone))
+        event.add("dtstamp", datetime.now(timezone))
 
-        event.add('location', f"{course.campus}, Room {course.room}")
+        event.add("location", f"{course.campus}, Room {course.room}")
 
         cal.add_component(event)
         logger.debug(f"Added event {i+1}/{len(courses)}: {course.name} ({course.day} {course.duration})")

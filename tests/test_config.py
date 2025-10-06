@@ -1,8 +1,11 @@
 """
 Unit tests for Configuration module
 """
-import pytest
+
 import os
+
+import pytest
+
 from app.config import Config
 
 

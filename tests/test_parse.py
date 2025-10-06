@@ -1,15 +1,12 @@
 """
 Unit tests for Parse module
 """
+
+import numpy as np
 import pytest
 from PIL import Image
-import numpy as np
-from app.Parse import (
-    calculate_iou,
-    filter_duplicate_boxes,
-    Course,
-    create_courses
-)
+
+from app.Parse import Course, calculate_iou, create_courses, filter_duplicate_boxes
 
 
 class TestCalculateIOU:
@@ -66,11 +63,13 @@ class TestCreateCourses:
 
     def test_full_course_details(self):
         """Test creating course with all details"""
-        subjects = [{
-            "details": "MATH 101 ID: MTH101 Activity: Lecture Section: A Campus: Main Room: 201",
-            "day": "MONDAY",
-            "time": ["08:00", "09:30"]
-        }]
+        subjects = [
+            {
+                "details": "MATH 101 ID: MTH101 Activity: Lecture Section: A Campus: Main Room: 201",
+                "day": "MONDAY",
+                "time": ["08:00", "09:30"],
+            }
+        ]
         courses = create_courses(subjects)
         assert len(courses) == 1
         assert courses[0].name == "MATH 101"
@@ -84,11 +83,7 @@ class TestCreateCourses:
 
     def test_minimal_course_details(self):
         """Test creating course with minimal details"""
-        subjects = [{
-            "details": "Introduction to Physics",
-            "day": "TUESDAY",
-            "time": ["10:00", "11:30"]
-        }]
+        subjects = [{"details": "Introduction to Physics", "day": "TUESDAY", "time": ["10:00", "11:30"]}]
         courses = create_courses(subjects)
         assert len(courses) == 1
         assert courses[0].name == "Introduction to Physics"
@@ -97,11 +92,7 @@ class TestCreateCourses:
 
     def test_invalid_format(self):
         """Test handling of invalid subject format"""
-        subjects = [{
-            "details": "",
-            "day": "WEDNESDAY",
-            "time": ["14:00", "15:30"]
-        }]
+        subjects = [{"details": "", "day": "WEDNESDAY", "time": ["14:00", "15:30"]}]
         courses = create_courses(subjects)
         # Should skip invalid entries
         assert len(courses) == 0
@@ -120,18 +111,14 @@ class TestCourseModel:
             campus="North",
             room="305",
             day="FRIDAY",
-            duration="13:00-14:30"
+            duration="13:00-14:30",
         )
         assert course.name == "Test Course"
         assert course.id == "TC101"
 
     def test_course_defaults(self):
         """Test Course with default values"""
-        course = Course(
-            name="Minimal Course",
-            day="THURSDAY",
-            duration="09:00-10:00"
-        )
+        course = Course(name="Minimal Course", day="THURSDAY", duration="09:00-10:00")
         assert course.id == ""
         assert course.activity == ""
         assert course.section == ""
