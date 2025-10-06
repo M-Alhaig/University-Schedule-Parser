@@ -1,11 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
-from fastapi.responses import JSONResponse, Response
+
+from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import logging
 import sys
 import json
 from datetime import datetime
+import os
+import time
 
 from app.Parse import parse
 from app.config import config
@@ -102,6 +105,26 @@ async def get_detailed_metrics():
     return stats
 
 
+@app.get("/api/metrics/history")
+async def get_metrics_history():
+    """Get recent request history for dashboard"""
+    history = metrics.get_request_history(limit=100)
+    return history
+
+
+@app.get("/dashboard")
+async def dashboard():
+    """Serve the admin dashboard"""
+    dashboard_path = os.path.join(os.path.dirname(__file__), "static", "dashboard.html")
+    if os.path.exists(dashboard_path):
+        return FileResponse(dashboard_path)
+    else:
+        return JSONResponse(
+            content={"error": "Dashboard not found"},
+            status_code=404
+        )
+
+
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
@@ -117,11 +140,15 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
     logger.info(f"Received parse request for file: {file.filename}, browser: {browser}")
     metrics.increment("requests_total")
 
+    start_time = time.time()
+
     # Validate file size
     if file.size > config.MAX_FILE_SIZE:
+        duration_ms = (time.time() - start_time) * 1000
         logger.warning(f"File rejected - size {file.size} bytes exceeds limit of {config.MAX_FILE_SIZE} bytes")
         metrics.increment("requests_failed")
         metrics.record_error("file_too_large", f"File size: {file.size}")
+        metrics.add_request_to_history("failed", duration_ms, "file_too_large")
         return JSONResponse(content={"message": "File too large"}, status_code=413)
 
     # Note: browser parameter is deprecated (kept for backward compatibility)
@@ -129,17 +156,21 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
 
     # Validate content type
     if file.content_type not in config.ALLOWED_CONTENT_TYPES:
+        duration_ms = (time.time() - start_time) * 1000
         logger.warning(f"Invalid file type: {file.content_type}. Expected: {config.ALLOWED_CONTENT_TYPES}")
         metrics.increment("requests_failed")
         metrics.record_error("invalid_content_type", f"Type: {file.content_type}")
+        metrics.add_request_to_history("failed", duration_ms, "invalid_content_type")
         return JSONResponse(content={"message": "Invalid file type"}, status_code=400)
 
     try:
         logger.info(f"Starting parse process for {file.filename} with {browser} browser settings")
         browser = browser.upper()
         response = await parse(file, browser)
+        duration_ms = (time.time() - start_time) * 1000
         logger.info(f"Successfully generated calendar for {file.filename}")
         metrics.increment("requests_success")
+        metrics.add_request_to_history("success", duration_ms)
         metrics.log_metrics()
 
         return Response(
@@ -149,23 +180,29 @@ async def parse_schedule(file: UploadFile = File(...), browser: str = Form(defau
             "Content-Disposition": f"attachment; filename={config.CALENDAR_FILENAME}"
         })
     except ValueError as e:
+        duration_ms = (time.time() - start_time) * 1000
         logger.warning(f"Validation error while parsing {file.filename}: {e}")
         metrics.increment("requests_failed")
         metrics.record_error("validation_error", str(e))
+        metrics.add_request_to_history("failed", duration_ms, "validation_error")
         return JSONResponse(
             content={"error": "Validation error", "message": "Invalid input data"},
             status_code=400
         )
     except HTTPException as e:
+        duration_ms = (time.time() - start_time) * 1000
         # Re-raise HTTP exceptions (like from ParsePDF)
         logger.warning(f"HTTP error while parsing {file.filename}: {e.detail}")
         metrics.increment("requests_failed")
         metrics.record_error("http_exception", e.detail)
+        metrics.add_request_to_history("failed", duration_ms, "http_exception")
         raise
     except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
         logger.error(f"Internal server error while parsing {file.filename}: {e}", exc_info=True)
         metrics.increment("requests_failed")
         metrics.record_error("internal_error", str(e))
+        metrics.add_request_to_history("failed", duration_ms, "internal_error")
         return JSONResponse(
             content={"error": "Internal server error", "message": "Failed to process the file. Please ensure it's a valid schedule PDF."},
             status_code=500

@@ -23,6 +23,7 @@ class Metrics:
             "requests_failed": 0,
             "processing_times": [],
             "errors": [],
+            "request_history": [],  # For dashboard visualization
             # Stage-specific timings
             "pdf_processing_times": [],
             "box_extraction_times": [],
@@ -136,6 +137,44 @@ class Metrics:
         stats = self.get_stats()
         logger.info(f"METRICS: {json.dumps(stats)}")
 
+    def get_request_history(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get recent request history for dashboard display.
+
+        Args:
+            limit: Maximum number of recent requests to return
+
+        Returns:
+            List of request history entries
+        """
+        history = self.metrics.get("request_history", [])
+        return history[-limit:]
+
+    def add_request_to_history(self, status: str, duration_ms: float, error_type: str = None):
+        """
+        Add a request to the history tracking.
+
+        Args:
+            status: "success" or "failed"
+            duration_ms: Processing time in milliseconds
+            error_type: Type of error if failed
+        """
+        if "request_history" not in self.metrics:
+            self.metrics["request_history"] = []
+
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "status": status,
+            "duration_ms": duration_ms,
+            "error_type": error_type
+        }
+
+        self.metrics["request_history"].append(entry)
+
+        # Keep only last 100 entries to avoid memory bloat
+        if len(self.metrics["request_history"]) > 100:
+            self.metrics["request_history"] = self.metrics["request_history"][-100:]
+
     def reset(self):
         """Reset all metrics"""
         self.metrics = {
@@ -144,6 +183,11 @@ class Metrics:
             "requests_failed": 0,
             "processing_times": [],
             "errors": [],
+            "request_history": [],
+            "pdf_processing_times": [],
+            "box_extraction_times": [],
+            "ocr_processing_times": [],
+            "calendar_generation_times": [],
         }
         logger.info("Metrics reset")
 
