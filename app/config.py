@@ -57,6 +57,14 @@ class Config:
     # Debug settings
     DEBUG_SAVE_BOXES = os.getenv("DEBUG_SAVE_BOXES", "true").lower() == "true"
 
+    # Logging settings
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")  # dev or prod
+    LOG_FORMAT = os.getenv("LOG_FORMAT", "text")  # text or json
+    # Auto-detect Lambda environment
+    if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        ENVIRONMENT = "prod"
+        LOG_FORMAT = "json"
+
     # Calendar settings
     SCHEDULE_DURATION_WEEKS = int(os.getenv("SCHEDULE_DURATION_WEEKS", 19))
     DEFAULT_TIMEZONE: Literal["KSA", "ALG"] = os.getenv("DEFAULT_TIMEZONE", "KSA")  # type: ignore

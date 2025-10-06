@@ -364,6 +364,9 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
 
 
 async def parse(file: UploadFile, browser: str) -> bytes:
+    import time
+    from app.metrics import metrics
+
     logger.info(f"Starting parse workflow for {browser} browser")
 
     file_bytes = await file.read()
@@ -372,13 +375,18 @@ async def parse(file: UploadFile, browser: str) -> bytes:
 
     image = None
     try:
+        # Stage 1: PDF/Image Processing
+        stage_start = time.time()
         if file.content_type == "application/pdf":
             logger.info("Processing PDF file")
             image, file_type = handle_pdf(file_buffer, browser)
         else:
             logger.info("Processing image file")
             image, file_type = handle_img(file_buffer, browser)
+        metrics.record_time("pdf_processing_times", (time.time() - stage_start) * 1000)
 
+        # Stage 2: Box Extraction
+        stage_start = time.time()
         boxes = extract_boxes_from_image(image, file_type=file_type)
 
         # Validate boxes were extracted
@@ -390,7 +398,10 @@ async def parse(file: UploadFile, browser: str) -> bytes:
         if config.DEBUG_SAVE_BOXES:
             image.save("test.png")
             logger.debug("Saved test image to test.png")
+        metrics.record_time("box_extraction_times", (time.time() - stage_start) * 1000)
 
+        # Stage 3: OCR Processing
+        stage_start = time.time()
         subjects = get_subjects_data(boxes, image)
 
         # Validate subjects were extracted
@@ -404,10 +415,14 @@ async def parse(file: UploadFile, browser: str) -> bytes:
         if not courses:
             logger.error(f"No courses created from {len(subjects)} subjects")
             raise ValueError("Failed to parse course information. The schedule format may be invalid.")
+        metrics.record_time("ocr_processing_times", (time.time() - stage_start) * 1000)
 
+        # Stage 4: Calendar Generation
+        stage_start = time.time()
         logger.info("Generating ICS calendar")
         logger.info(courses)
         calendar = create_schedule_ics(courses)
+        metrics.record_time("calendar_generation_times", (time.time() - stage_start) * 1000)
 
         logger.info(f"Parse workflow completed successfully: {len(courses)} courses")
         return calendar
