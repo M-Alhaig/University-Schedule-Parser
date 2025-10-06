@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.10"
 
 jobs:
   lint:
@@ -133,6 +133,8 @@ jobs:
         with:
           context: .
           push: false
+          platforms: linux/amd64
+          provenance: false
           tags: schedule-parser:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -140,7 +142,7 @@ jobs:
       - name: Test Docker image
         run: |
           docker build -t schedule-parser:test .
-          docker run --rm schedule-parser:test python -c "import app.main; print('Docker image works!')"
+          docker run --rm --entrypoint python schedule-parser:test -c "import app.main; import cv2; import pytesseract; print('✓ Docker image works!')"
 
   deploy:
     name: Push to ECR (Optional)
@@ -151,6 +153,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -170,11 +175,14 @@ jobs:
         if: steps.login-ecr.outcome == 'success'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: schedule-parser
+          ECR_REPOSITORY: schedule-parser-repo
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --push \
+            .
           echo "Image pushed to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
