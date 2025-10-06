@@ -385,7 +385,12 @@ async def parse(file: UploadFile, browser: str) -> bytes:
         if not boxes:
             logger.error("No boxes detected in the schedule image")
             raise ValueError("No schedule table detected. Please ensure the PDF contains a valid weekly schedule table.")
-        image.save("test.png")
+
+        # Save debug image if enabled
+        if config.DEBUG_SAVE_BOXES:
+            image.save("test.png")
+            logger.debug("Saved test image to test.png")
+
         subjects = get_subjects_data(boxes, image)
 
         # Validate subjects were extracted
