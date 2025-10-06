@@ -80,7 +80,7 @@ class TestCreateCourses:
         assert courses[0].campus == "Main"
         assert courses[0].room == "201"
         assert courses[0].day == "MONDAY"
-        assert courses[0].duration == "08:0009:30"
+        assert courses[0].duration == "08:00-09:30"
 
     def test_minimal_course_details(self):
         """Test creating course with minimal details"""

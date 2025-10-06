@@ -4,7 +4,7 @@ Unit tests for Parse module with mocked dependencies
 import pytest
 from PIL import Image
 import numpy as np
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from io import BytesIO
 from app.Parse import (
     calculate_iou,
@@ -101,13 +101,23 @@ class TestGetSubjectsDataWithMocks:
         """Test that subjects are extracted from boxes"""
         from app.Parse import get_subjects_data
 
-        # Mock OCR to return course data
-        mock_tesseract['image_to_string'].return_value = "MATH 101 ID: MTH101"
+        # Mock OCR to return proper day names, time, and course data
+        def mock_ocr(image):
+            text = getattr(mock_ocr, 'call_count', 0)
+            mock_ocr.call_count = text + 1
+            # First few calls should return day names and time
+            if text == 0:
+                return "MONDAY"
+            elif text == 1:
+                return "08:00"  # Time reference
+            else:
+                return "MATH 101 ID: MTH101"
 
-        with patch('concurrent.futures.ThreadPoolExecutor'):
-            subjects = get_subjects_data(sample_boxes, sample_image)
-            # Should extract subjects (exact count depends on mocking)
-            assert isinstance(subjects, list)
+        mock_tesseract['image_to_string'].side_effect = mock_ocr
+
+        subjects = get_subjects_data(sample_boxes, sample_image)
+        # Should extract subjects (at least we should get a list back)
+        assert isinstance(subjects, list)
 
 
 class TestResourceCleanup:
@@ -120,22 +130,21 @@ class TestResourceCleanup:
 
         # Create mock file upload
         mock_file = Mock()
-        mock_file.read = Mock(return_value=b"fake pdf content")
+        mock_file.read = AsyncMock(return_value=b"fake pdf content")
         mock_file.content_type = "application/pdf"
 
-        with patch('app.Parse.handle_pdf') as mock_pdf, \
+        with patch('app.Parse.process_file_to_image') as mock_pdf, \
              patch('app.Parse.extract_boxes_from_image') as mock_boxes, \
-             patch('app.Parse.get_subjects_data') as mock_subjects, \
-             patch('app.Parse.create_courses') as mock_courses, \
-             patch('app.Parse.create_schedule_ics') as mock_ics:
+             patch('app.Parse.extract_and_create_courses') as mock_courses_extract, \
+             patch('app.Parse.generate_calendar') as mock_calendar:
 
             # Setup mocks
             mock_image = Mock(spec=Image.Image)
             mock_pdf.return_value = (mock_image, "PDF")
             mock_boxes.return_value = [(10, 10, 100, 100)]
-            mock_subjects.return_value = [{"details": "test", "day": "MONDAY", "time": ["08:00", "09:00"]}]
-            mock_courses.return_value = [Mock()]
-            mock_ics.return_value = b"fake ics data"
+            from app.Parse import Course
+            mock_courses_extract.return_value = [Course(name="Test", day="MONDAY", duration="08:00-09:00")]
+            mock_calendar.return_value = b"fake ics data"
 
             result = await parse(mock_file, "CHROME")
 
@@ -149,10 +158,10 @@ class TestResourceCleanup:
         from app.Parse import parse
 
         mock_file = Mock()
-        mock_file.read = Mock(return_value=b"fake pdf content")
+        mock_file.read = AsyncMock(return_value=b"fake pdf content")
         mock_file.content_type = "application/pdf"
 
-        with patch('app.Parse.handle_pdf') as mock_pdf:
+        with patch('app.Parse.process_file_to_image') as mock_pdf:
             mock_image = Mock(spec=Image.Image)
             mock_pdf.return_value = (mock_image, "PDF")
 
