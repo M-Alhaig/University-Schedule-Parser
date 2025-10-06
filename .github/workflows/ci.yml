@@ -145,7 +145,7 @@ jobs:
           docker run --rm --entrypoint python schedule-parser:test -c "import app.main; import cv2; import pytesseract; print('✓ Docker image works!')"
 
   deploy:
-    name: Push to ECR (Optional)
+    name: Deploy to ECR
     runs-on: ubuntu-latest
     needs: [build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -163,16 +163,12 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-        if: env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
-        continue-on-error: true
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        continue-on-error: true
 
       - name: Build, tag, and push image to Amazon ECR
-        if: steps.login-ecr.outcome == 'success'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: schedule-parser-repo
