@@ -17,6 +17,7 @@ from app.IcsService import create_schedule_ics
 from app.ParseImg import handle_img
 from app.ParsePDF import handle_pdf
 from app.config import config
+from app.metrics import track_time
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ def filter_duplicate_boxes(
     return filtered_boxes
 
 
+@track_time("box_extraction_times")
 def extract_boxes_from_image(
     image: Image.Image,
     file_type: str = "PDF"
@@ -363,10 +365,91 @@ def create_courses(subjects: List[Dict[str, Any]]) -> List[Course]:
     return subject_objects
 
 
-async def parse(file: UploadFile, browser: str) -> bytes:
-    import time
-    from app.metrics import metrics
+# Wrapper functions with timing decorators
 
+@track_time("pdf_processing_times")
+def process_file_to_image(file_buffer: BytesIO, browser: str, content_type: str) -> Tuple[Image.Image, str]:
+    """
+    Process uploaded file (PDF or image) and return PIL Image.
+
+    Args:
+        file_buffer: File content as BytesIO
+        browser: Browser type (for backward compatibility)
+        content_type: MIME type of the file
+
+    Returns:
+        Tuple of (PIL Image, file type string)
+    """
+    if content_type == "application/pdf":
+        logger.info("Processing PDF file")
+        return handle_pdf(file_buffer, browser)
+    else:
+        logger.info("Processing image file")
+        return handle_img(file_buffer, browser)
+
+
+@track_time("ocr_processing_times")
+def extract_and_create_courses(boxes: List[Tuple[int, int, int, int]], image: Image.Image) -> List[Course]:
+    """
+    Extract subjects from boxes using OCR and create Course objects.
+
+    Args:
+        boxes: List of detected bounding boxes
+        image: PIL Image to extract text from
+
+    Returns:
+        List of Course objects
+    """
+    subjects = get_subjects_data(boxes, image)
+
+    # Validate subjects were extracted
+    if not subjects:
+        logger.error(f"No subjects extracted from {len(boxes)} boxes")
+        raise ValueError("No course information could be extracted. The schedule format may not be supported.")
+
+    courses = create_courses(subjects)
+
+    # Validate courses were created
+    if not courses:
+        logger.error(f"No courses created from {len(subjects)} subjects")
+        raise ValueError("Failed to parse course information. The schedule format may be invalid.")
+
+    return courses
+
+
+@track_time("calendar_generation_times")
+def generate_calendar(courses: List[Course]) -> bytes:
+    """
+    Generate ICS calendar from Course objects.
+
+    Args:
+        courses: List of Course objects
+
+    Returns:
+        ICS calendar as bytes
+    """
+    logger.info("Generating ICS calendar")
+    logger.info(courses)
+    return create_schedule_ics(courses)
+
+
+async def parse(file: UploadFile, browser: str) -> bytes:
+    """
+    Main parse workflow that processes uploaded schedule files and generates ICS calendar.
+
+    Stages (with automatic timing via decorators):
+    1. PDF/Image Processing - Convert file to PIL Image
+    2. Box Extraction - Detect table cells using morphological operations
+    3. OCR Processing - Extract text and create Course objects
+    4. Calendar Generation - Generate ICS file from courses
+
+    Args:
+        file: Uploaded file (PDF or image)
+        browser: Browser type (for backward compatibility)
+
+    Returns:
+        ICS calendar as bytes
+    """
     logger.info(f"Starting parse workflow for {browser} browser")
 
     file_bytes = await file.read()
@@ -375,18 +458,10 @@ async def parse(file: UploadFile, browser: str) -> bytes:
 
     image = None
     try:
-        # Stage 1: PDF/Image Processing
-        stage_start = time.time()
-        if file.content_type == "application/pdf":
-            logger.info("Processing PDF file")
-            image, file_type = handle_pdf(file_buffer, browser)
-        else:
-            logger.info("Processing image file")
-            image, file_type = handle_img(file_buffer, browser)
-        metrics.record_time("pdf_processing_times", (time.time() - stage_start) * 1000)
+        # Stage 1: PDF/Image Processing (timed by decorator)
+        image, file_type = process_file_to_image(file_buffer, browser, file.content_type)
 
-        # Stage 2: Box Extraction
-        stage_start = time.time()
+        # Stage 2: Box Extraction (timed by decorator)
         boxes = extract_boxes_from_image(image, file_type=file_type)
 
         # Validate boxes were extracted
@@ -398,31 +473,12 @@ async def parse(file: UploadFile, browser: str) -> bytes:
         if config.DEBUG_SAVE_BOXES:
             image.save("test.png")
             logger.debug("Saved test image to test.png")
-        metrics.record_time("box_extraction_times", (time.time() - stage_start) * 1000)
 
-        # Stage 3: OCR Processing
-        stage_start = time.time()
-        subjects = get_subjects_data(boxes, image)
+        # Stage 3: OCR Processing (timed by decorator)
+        courses = extract_and_create_courses(boxes, image)
 
-        # Validate subjects were extracted
-        if not subjects:
-            logger.error(f"No subjects extracted from {len(boxes)} boxes")
-            raise ValueError("No course information could be extracted. The schedule format may not be supported.")
-
-        courses = create_courses(subjects)
-
-        # Validate courses were created
-        if not courses:
-            logger.error(f"No courses created from {len(subjects)} subjects")
-            raise ValueError("Failed to parse course information. The schedule format may be invalid.")
-        metrics.record_time("ocr_processing_times", (time.time() - stage_start) * 1000)
-
-        # Stage 4: Calendar Generation
-        stage_start = time.time()
-        logger.info("Generating ICS calendar")
-        logger.info(courses)
-        calendar = create_schedule_ics(courses)
-        metrics.record_time("calendar_generation_times", (time.time() - stage_start) * 1000)
+        # Stage 4: Calendar Generation (timed by decorator)
+        calendar = generate_calendar(courses)
 
         logger.info(f"Parse workflow completed successfully: {len(courses)} courses")
         return calendar
