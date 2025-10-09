@@ -44,18 +44,26 @@ class JsonFormatter(logging.Formatter):
 
 
 # Configure root logger based on environment
+# Get the root logger and configure it explicitly for Lambda compatibility
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Remove any existing handlers to avoid duplicate logs
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
 if config.LOG_FORMAT == "json":
     # JSON format for production/Lambda
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
-    logging.basicConfig(level=logging.INFO, handlers=[handler])
+    handler.setLevel(logging.INFO)
+    root_logger.addHandler(handler)
 else:
     # Human-readable format for development
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    handler.setLevel(logging.INFO)
+    root_logger.addHandler(handler)
 
 app = FastAPI()
 
