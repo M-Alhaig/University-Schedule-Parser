@@ -1,41 +1,67 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Git
-.git/
-.gitignore
-
-# Docker
-Dockerfile
-.dockerignore
-
-# Logs
-*.log
+.venv/
+*.egg-info/
+dist/
+build/
 
 # Testing
+tests/
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+*.coverage
+
+# Examples and test data
+examples/
+CHROME_EX/
+FIREFOX_EX/
+
+# Debug files
+*.png
+*.jpg
+test.png
+debug_boxes.png
+
+# CI/CD
+.github/
+.gitlab-ci.yml
 
 # Documentation
 README.md
+CLAUDE.md
 docs/
+*.md
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.example

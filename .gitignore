@@ -19,3 +19,9 @@
 /schedule_with_boxes.pdf
 /vertical_lines.jpg
 /.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+/CHROME_EX/
+/FIREFOX_EX/
