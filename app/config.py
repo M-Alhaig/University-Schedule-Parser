@@ -56,7 +56,7 @@ class Config:
     MAX_WORKERS = int(os.getenv("MAX_WORKERS", 8))
 
     # Debug settings
-    DEBUG_SAVE_BOXES = os.getenv("DEBUG_SAVE_BOXES", "true").lower() == "true"
+    DEBUG_SAVE_BOXES = os.getenv("DEBUG_SAVE_BOXES", "false").lower() == "true"
 
     # Logging settings
     ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")  # dev or prod
