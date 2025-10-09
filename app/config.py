@@ -79,7 +79,7 @@ class Config:
 
     # CORS Settings
     ALLOWED_ORIGINS = os.getenv(
-        "ALLOWED_ORIGINS", "https://zocq7dcly5.execute-api.me-central-1.amazonaws.com,https://schedule-parser.malhaig.online"
+        "ALLOWED_ORIGINS", "https://zocq7dcly5.execute-api.me-central-1.amazonaws.com,https://uni-parser.malhaig.online"
     ).split(",")
 
 
