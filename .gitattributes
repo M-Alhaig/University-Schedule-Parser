@@ -1,4 +1,4 @@
 # .gitattributes
 
-/poppler linguist-vendored
-/Tesseract-OCR linguist-vendored
+poppler/** linguist-vendored
+Tesseract-OCR/** linguist-vendored
